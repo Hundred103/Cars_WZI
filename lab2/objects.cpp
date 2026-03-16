@@ -1,6 +1,6 @@
 /*********************************************************************
-	Simulation obiektów fizycznych ruchomych np. samochody, statki, roboty, itd.
-	+ obs³uga obiektów statycznych np. env.
+	Simulation obiektï¿½w fizycznych ruchomych np. samochody, statki, roboty, itd.
+	+ obsï¿½uga obiektï¿½w statycznych np. env.
 	**********************************************************************/
 
 #include <stdio.h>
@@ -20,32 +20,32 @@ extern bool if_ID_visible;
 
 MovableObject::MovableObject()             // konstruktor                   
 {
-	iID = 100+(unsigned int)(rand() % 900);  // identyfikator obiektu
+	iID = (unsigned int)(rand() % 1000);  // identyfikator obiektu
 	fprintf(f, "my_car->iID = %d\n", iID);
 
-	// zmienne zwi¹zame z akcjami kierowcy
-	F = Fb = 0;	// si³y dzia³aj¹ce na obiekt 
-	breaking_factor = 0;			// stopieñ hamowania
-	steer_wheel_speed = 0;  // prêdkoœæ krêcenia kierownic¹ w rad/s
+	// zmienne zwiï¿½zame z akcjami kierowcy
+	F = Fb = 0;	// siï¿½y dziaï¿½ajï¿½ce na obiekt 
+	breaking_factor = 0;			// stopieï¿½ hamowania
+	steer_wheel_speed = 0;  // prï¿½dkoï¿½ï¿½ krï¿½cenia kierownicï¿½ w rad/s
 	if_keep_steer_wheel = 0;  // informacja czy kieronica jest trzymana
 
-	// sta³e samochodu
-	mass_own = 12.0;			// masa obiektu [kg]
-	//Fy = mass_own*9.81;        // si³a nacisku na podstawê obiektu (na ko³a pojazdu)
+	// staï¿½e samochodu
+	mass_own = 6.0;			// masa obiektu [kg]
+	//Fy = mass_own*9.81;        // siï¿½a nacisku na podstawï¿½ obiektu (na koï¿½a pojazdu)
 	length = 9.0;
 	width = 5.0;
 	height = 1.7;
-	clearance = 0.0;     // wysokoœæ na której znajduje siê podstawa obiektu
-	front_axis_dist = 1.0;     // odleg³oœæ od przedniej osi do przedniego zderzaka 
-	back_axis_dist = 0.2;       // odleg³oœæ od tylniej osi do tylniego zderzaka
-	steer_wheel_ret_speed = 0.5; // prêdkoœæ powrotu kierownicy w rad/s (gdy zostateie puszczona)
+	clearance = 0.0;     // wysokoï¿½ï¿½ na ktï¿½rej znajduje siï¿½ podstawa obiektu
+	front_axis_dist = 1.0;     // odlegï¿½oï¿½ï¿½ od przedniej osi do przedniego zderzaka 
+	back_axis_dist = 0.2;       // odlegï¿½oï¿½ï¿½ od tylniej osi do tylniego zderzaka
+	steer_wheel_ret_speed = 4.0; // prï¿½dkoï¿½ï¿½ powrotu kierownicy w rad/s
 
 	// parametry stateu auta:
 	state.steering_angle = 0;
-	state.vPos.y = clearance + height / 2 + 20; // wysokoœæ œrodka ciê¿koœci w osi pionowej pojazdu
+	state.vPos.y = clearance + height / 2 + 20; // wysokoï¿½ï¿½ ï¿½rodka ciï¿½koï¿½ci w osi pionowej pojazdu
 	state.vPos.x = 0;
 	state.vPos.z = 0;
-	quaternion qObr = AsixToQuat(Vector3(0, 1, 0), 0.1*PI / 180.0); // obrót obiektu o k¹t 30 stopni wzglêdem osi y:
+	quaternion qObr = AsixToQuat(Vector3(0, 1, 0), 0.1*PI / 180.0); // obrï¿½t obiektu o kï¿½t 30 stopni wzglï¿½dem osi y:
 	state.qOrient = qObr*state.qOrient;
 }
 
@@ -54,11 +54,11 @@ MovableObject::~MovableObject()            // destruktor
 }
 
 void MovableObject::ChangeState(ObjectState __state)  // przepisanie podanego stateu 
-{                                                // w przypadku obiektów, które nie s¹ symulowane
+{                                                // w przypadku obiektï¿½w, ktï¿½re nie sï¿½ symulowane
 	state = __state;
 }
 
-ObjectState MovableObject::State()                // metoda zwracaj¹ca state obiektu ³¹cznie z iID
+ObjectState MovableObject::State()                // metoda zwracajï¿½ca state obiektu ï¿½ï¿½cznie z iID
 {
 	return state;
 }
@@ -66,37 +66,37 @@ ObjectState MovableObject::State()                // metoda zwracaj¹ca state obi
 
 
 void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na podstawie dotychczasowego,
-{                                                // dzia³aj¹cych si³ i czasu, jaki up³yn¹³ od ostatniej symulacji
+{                                                // dziaï¿½ajï¿½cych siï¿½ i czasu, jaki upï¿½ynï¿½ï¿½ od ostatniej symulacji
 
 	if (dt == 0) return;
 
-	float friction = 3.0;            // wspó³czynnik tarcia obiektu o pod³o¿e 
-	float friction_rot = friction;     // friction obrotowe (w szczególnych przypadkach mo¿e byæ inne ni¿ liniowe)
-	float friction_roll = 0.15;    // wspó³czynnik tarcia tocznego
-	float elasticity = 0.5;       // wspó³czynnik sprê¿ystoœci (0-brak sprê¿ystoœci, 1-doskona³a sprê¿ystoœæ) 
+	float friction = 5.0;            // wspï¿½czynnik tarcia obiektu o podï¿½oï¿½e
+	float friction_rot = friction;
+	float friction_roll = 0.05;    // wspï¿½czynnik tarcia tocznego
+	float elasticity = 0.5;       // wspï¿½czynnik sprï¿½ystoï¿½ci (0-brak sprï¿½ystoï¿½ci, 1-doskonaï¿½a sprï¿½ystoï¿½ï¿½) 
 	float g = 9.81;                // przyspieszenie grawitacyjne
-	float Fy = mass_own*9.81;        // si³a nacisku na podstawê obiektu (na ko³a pojazdu)
+	float Fy = mass_own*9.81;        // siï¿½a nacisku na podstawï¿½ obiektu (na koï¿½a pojazdu)
 
-	// obracam uk³ad wspó³rzêdnych lokalnych wed³ug quaterniona orientacji:
-	Vector3 dir_forward = state.qOrient.rotate_vector(Vector3(1, 0, 0)); // na razie oœ obiektu pokrywa siê z osi¹ x globalnego uk³adu wspó³rzêdnych (lokalna oœ x)
-	Vector3 dir_up = state.qOrient.rotate_vector(Vector3(0, 1, 0));  // wektor skierowany pionowo w górê od podstawy obiektu (lokalna oœ y)
-	Vector3 dir_right = state.qOrient.rotate_vector(Vector3(0, 0, 1)); // wektor skierowany w prawo (lokalna oœ z)
+	// obracam ukï¿½ad wspï¿½rzï¿½dnych lokalnych wedï¿½ug quaterniona orientacji:
+	Vector3 dir_forward = state.qOrient.rotate_vector(Vector3(1, 0, 0)); // na razie oï¿½ obiektu pokrywa siï¿½ z osiï¿½ x globalnego ukï¿½adu wspï¿½rzï¿½dnych (lokalna oï¿½ x)
+	Vector3 dir_up = state.qOrient.rotate_vector(Vector3(0, 1, 0));  // wektor skierowany pionowo w gï¿½rï¿½ od podstawy obiektu (lokalna oï¿½ y)
+	Vector3 dir_right = state.qOrient.rotate_vector(Vector3(0, 0, 1)); // wektor skierowany w prawo (lokalna oï¿½ z)
 
 
-	// rzutujemy vV na sk³adow¹ w kierunku przodu i pozosta³e 2 sk³adowe
-	// sk³adowa w bok jest zmniejszana przez si³ê tarcia, sk³adowa do przodu
-	// przez si³ê tarcia tocznego
+	// rzutujemy vV na skï¿½adowï¿½ w kierunku przodu i pozostaï¿½e 2 skï¿½adowe
+	// skï¿½adowa w bok jest zmniejszana przez siï¿½ï¿½ tarcia, skï¿½adowa do przodu
+	// przez siï¿½ï¿½ tarcia tocznego
 	Vector3 vV_forward = dir_forward*(state.vV^dir_forward),
 		vV_right = dir_right*(state.vV^dir_right),
 		vV_up = dir_up*(state.vV^dir_up);
 
-	// rzutujemy prêdkoœæ k¹tow¹ vV_ang na sk³adow¹ w kierunku przodu i pozosta³e 2 sk³adowe
+	// rzutujemy prï¿½dkoï¿½ï¿½ kï¿½towï¿½ vV_ang na skï¿½adowï¿½ w kierunku przodu i pozostaï¿½e 2 skï¿½adowe
 	Vector3 vV_ang_forward = dir_forward*(state.vV_ang^dir_forward),
 		vV_ang_right = dir_right*(state.vV_ang^dir_right),
 		vV_ang_up = dir_up*(state.vV_ang^dir_up);
 
 
-	// ruch kó³ na skutek krêcenia lub puszczenia kierownicy:  
+	// ruch kï¿½ na skutek krï¿½cenia lub puszczenia kierownicy:  
 
 	if (steer_wheel_speed != 0)
 		state.steering_angle += steer_wheel_speed*dt;
@@ -117,8 +117,8 @@ void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na
 	if (state.steering_angle > PI*60.0 / 180) state.steering_angle = PI*60.0 / 180;
 	if (state.steering_angle < -PI*60.0 / 180) state.steering_angle = -PI*60.0 / 180;
 
-	// obliczam promien skrêtu pojazdu na podstawie k¹ta skrêtu kó³, a nastêpnie na podstawie promienia skrêtu
-	// obliczam prêdkoœæ k¹tow¹ (UPROSZCZENIE! pomijam przyspieszenie k¹towe oraz w³aœciw¹ trajektoriê ruchu)
+	// obliczam promien skrï¿½tu pojazdu na podstawie kï¿½ta skrï¿½tu kï¿½, a nastï¿½pnie na podstawie promienia skrï¿½tu
+	// obliczam prï¿½dkoï¿½ï¿½ kï¿½towï¿½ (UPROSZCZENIE! pomijam przyspieszenie kï¿½towe oraz wï¿½aï¿½ciwï¿½ trajektoriï¿½ ruchu)
 	if (Fy > 0)
 	{
 		float V_ang_turn = 0;
@@ -129,7 +129,7 @@ void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na
 		}
 		Vector3 vV_ang_turn = dir_up*V_ang_turn*(state.steering_angle > 0 ? 1 : -1);
 		Vector3 vV_ang_up2 = vV_ang_up + vV_ang_turn;
-		if (vV_ang_up2.length() <= vV_ang_up.length()) // skrêt przeciwdzia³a obrotowi
+		if (vV_ang_up2.length() <= vV_ang_up.length()) // skrï¿½t przeciwdziaï¿½a obrotowi
 		{
 			if (vV_ang_up2.length() > V_ang_turn)
 				vV_ang_up = vV_ang_up2;
@@ -142,18 +142,18 @@ void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na
 				vV_ang_up = vV_ang_turn;
 		}
 
-		// friction zmniejsza prêdkoœæ obrotow¹ (UPROSZCZENIE! zamiast masy winienem wykorzystaæ moment bezw³adnoœci)     
-		float V_ang_friction = Fy*friction_rot*dt / mass_own / 1.0;      // zmiana pr. k¹towej spowodowana frictionm
+		// friction zmniejsza prï¿½dkoï¿½ï¿½ obrotowï¿½ (UPROSZCZENIE! zamiast masy winienem wykorzystaï¿½ moment bezwï¿½adnoï¿½ci)     
+		float V_ang_friction = Fy*friction_rot*dt / mass_own / 1.0;      // zmiana pr. kï¿½towej spowodowana frictionm
 		float V_ang_up = vV_ang_up.length() - V_ang_friction;
-		if (V_ang_up < V_ang_turn) V_ang_up = V_ang_turn;        // friction nie mo¿e spowodowaæ zmiany zwrotu wektora pr. k¹towej
+		if (V_ang_up < V_ang_turn) V_ang_up = V_ang_turn;        // friction nie moï¿½e spowodowaï¿½ zmiany zwrotu wektora pr. kï¿½towej
 		vV_ang_up = vV_ang_up.znorm()*V_ang_up;
 	}
 
 
-	Fy = mass_own*g*dir_up.y;                      // si³a docisku do pod³o¿a 
+	Fy = mass_own*g*dir_up.y;                      // siï¿½a docisku do podï¿½oï¿½a 
 	if (Fy < 0) Fy = 0;
-	// ... trzeba j¹ jeszcze uzale¿niæ od tego, czy obiekt styka siê z pod³o¿em!
-	float Fh = Fy*friction*breaking_factor;                  // si³a hamowania (UP: bez uwzglêdnienia poœlizgu)
+	// ... trzeba jï¿½ jeszcze uzaleï¿½niï¿½ od tego, czy obiekt styka siï¿½ z podï¿½oï¿½em!
+	float Fh = Fy*friction*breaking_factor;                  // siï¿½a hamowania (UP: bez uwzglï¿½dnienia poï¿½lizgu)
 
 	float V_up = vV_forward.length();// - dt*Fh/m - dt*friction_roll*Fy/m;
 	if (V_up < 0) V_up = 0;
@@ -163,46 +163,46 @@ void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na
 
 
 	// wjazd lub zjazd: 
-	//vPos.y = env.DistFromGround(vPos.x,vPos.z);   // najprostsze rozwi¹zanie - obiekt zmienia wysokoœæ bez zmiany orientacji
+	//vPos.y = env.DistFromGround(vPos.x,vPos.z);   // najprostsze rozwiï¿½zanie - obiekt zmienia wysokoï¿½ï¿½ bez zmiany orientacji
 
-	// 1. gdy wjazd na wklês³oœæ: wyznaczam wysokoœci envu pod naro¿nikami obiektu (ko³ami), 
-	// sprawdzam która trójka
-	// naro¿ników odpowiada najni¿ej po³o¿onemu œrodkowi ciê¿koœci, gdy przylega do envu
-	// wyznaczam prêdkoœæ podbicia (wznoszenia œrodka pojazdu spowodowanego wklês³oœci¹) 
-	// oraz prêdkoœæ k¹tow¹
-	// 2. gdy wjazd na wypuk³oœæ to si³a ciê¿koœci wywo³uje obrót przy du¿ej prêdkoœci liniowej
+	// 1. gdy wjazd na wklï¿½sï¿½oï¿½ï¿½: wyznaczam wysokoï¿½ci envu pod naroï¿½nikami obiektu (koï¿½ami), 
+	// sprawdzam ktï¿½ra trï¿½jka
+	// naroï¿½nikï¿½w odpowiada najniï¿½ej poï¿½oï¿½onemu ï¿½rodkowi ciï¿½koï¿½ci, gdy przylega do envu
+	// wyznaczam prï¿½dkoï¿½ï¿½ podbicia (wznoszenia ï¿½rodka pojazdu spowodowanej wklï¿½sï¿½oï¿½ciï¿½) 
+	// oraz prï¿½dkoï¿½ï¿½ kï¿½towï¿½
+	// 2. gdy wjazd na wypukï¿½oï¿½ï¿½ to siï¿½a ciï¿½koï¿½ci wywoï¿½uje obrï¿½t przy duï¿½ej prï¿½dkoï¿½ci liniowej
 
-	// punkty zaczepienia kó³ (na wysokoœci pod³ogi pojazdu):
+	// punkty zaczepienia kï¿½ (na wysokoï¿½ci podï¿½ogi pojazdu):
 	Vector3 P = state.vPos + dir_forward*(length / 2 - front_axis_dist) - dir_right*width / 2 - dir_up*height / 2,
 		Q = state.vPos + dir_forward*(length / 2 - front_axis_dist) + dir_right*width / 2 - dir_up*height / 2,
 		R = state.vPos + dir_forward*(-length / 2 + back_axis_dist) - dir_right*width / 2 - dir_up*height / 2,
 		S = state.vPos + dir_forward*(-length / 2 + back_axis_dist) + dir_right*width / 2 - dir_up*height / 2;
 
-	// pionowe rzuty punktów zacz. kó³ pojazdu na powierzchniê envu:  
+	// pionowe rzuty punktï¿½w zacz. kï¿½ pojazdu na powierzchniï¿½ envu:  
 	Vector3 Pt = P, Qt = Q, Rt = R, St = S;
 	Pt.y = env.DistFromGround(P.x, P.z); Qt.y = env.DistFromGround(Q.x, Q.z);
 	Rt.y = env.DistFromGround(R.x, R.z); St.y = env.DistFromGround(S.x, S.z);
 	Vector3 normPQR = normal_vector(Pt, Rt, Qt), normPRS = normal_vector(Pt, Rt, St), normPQS = normal_vector(Pt, St, Qt),
-		normQRS = normal_vector(Qt, Rt, St);   // normalne do p³aszczyzn wyznaczonych przez trójk¹ty
+		normQRS = normal_vector(Qt, Rt, St);   // normalne do pï¿½aszczyzn wyznaczonych przez trï¿½jkï¿½ty
 
 	//fprintf(f, "P.y = %f, Pt.y = %f, Q.y = %f, Qt.y = %f, R.y = %f, Rt.y = %f, S.y = %f, St.y = %f\n",
 	//	P.y, Pt.y, Q.y, Qt.y, R.y, Rt.y, S.y, St.y);
 
-	float sryPQR = ((Qt^normPQR) - normPQR.x*state.vPos.x - normPQR.z*state.vPos.z) / normPQR.y, // wys. œrodka pojazdu
-		sryPRS = ((Pt^normPRS) - normPRS.x*state.vPos.x - normPRS.z*state.vPos.z) / normPRS.y, // po najechaniu na skarpê 
-		sryPQS = ((Pt^normPQS) - normPQS.x*state.vPos.x - normPQS.z*state.vPos.z) / normPQS.y, // dla 4 trójek kó³
+	float sryPQR = ((Qt^normPQR) - normPQR.x*state.vPos.x - normPQR.z*state.vPos.z) / normPQR.y, // wys. ï¿½rodka pojazdu
+		sryPRS = ((Pt^normPRS) - normPRS.x*state.vPos.x - normPRS.z*state.vPos.z) / normPRS.y, // po najechaniu na skarpï¿½ 
+		sryPQS = ((Pt^normPQS) - normPQS.x*state.vPos.x - normPQS.z*state.vPos.z) / normPQS.y, // dla 4 trï¿½jek kï¿½
 		sryQRS = ((Qt^normQRS) - normQRS.x*state.vPos.x - normQRS.z*state.vPos.z) / normQRS.y;
 	float sry = sryPQR; Vector3 norm = normPQR;
 	if (sry > sryPRS) { sry = sryPRS; norm = normPRS; }
 	if (sry > sryPQS) { sry = sryPQS; norm = normPQS; }
-	if (sry > sryQRS) { sry = sryQRS; norm = normQRS; }  // wybór trójk¹ta o œrodku najni¿ej po³o¿onym    
+	if (sry > sryQRS) { sry = sryQRS; norm = normQRS; }  // wybï¿½r trï¿½jkï¿½ta o ï¿½rodku najniï¿½ej poï¿½oï¿½onym    
 
 	Vector3 vV_ang_horizontal = Vector3(0, 0, 0);
-	// jesli któreœ z kó³ jest poni¿ej powierzchni envu
+	// jesli ktï¿½reï¿½ z kï¿½ jest poniï¿½ej powierzchni envu
 	if ((P.y <= Pt.y + height / 2 + clearance) || (Q.y <= Qt.y + height / 2 + clearance) ||
 		(R.y <= Rt.y + height / 2 + clearance) || (S.y <= St.y + height / 2 + clearance))
 	{
-		// obliczam powsta³¹ prêdkoœæ k¹tow¹ w lokalnym uk³adzie wspó³rzêdnych:      
+		// obliczam powstaï¿½ï¿½ prï¿½dkoï¿½ï¿½ kï¿½towï¿½ w lokalnym ukï¿½adzie wspï¿½rzï¿½dnych:      
 		Vector3 v_rotation = -norm.znorm()*dir_up*0.6;
 		vV_ang_horizontal = v_rotation / dt;
 	}
@@ -212,60 +212,60 @@ void MovableObject::Simulation(float dt)          // obliczenie nowego stateu na
 	// jesli wiecej niz 2 kola sa na ziemi, to przyspieszenie grawitacyjne jest rownowazone przez opor gruntu:
 	if ((P.y <= Pt.y + height / 2 + clearance) + (Q.y <= Qt.y + height / 2 + clearance) +
 		(R.y <= Rt.y + height / 2 + clearance) + (S.y <= St.y + height / 2 + clearance) > 2)
-		vAg = vAg + dir_up*(dir_up^vAg)*-1; //przyspieszenie resultaj¹ce z si³y oporu gruntu
+		vAg = vAg + dir_up*(dir_up^vAg)*-1; //przyspieszenie resultajï¿½ce z siï¿½y oporu gruntu
 	else   // w przeciwnym wypadku brak sily docisku 
 		Fy = 0;
 
 
-	// sk³adam z powrotem wektor prêdkoœci k¹towej: 
+	// skï¿½adam z powrotem wektor prï¿½dkoï¿½ci kï¿½towej: 
 	//state.vV_ang = vV_ang_up + vV_ang_right + vV_ang_forward;  
 	state.vV_ang = vV_ang_up + vV_ang_horizontal;
 
 
-	float h = sry + height / 2 + clearance - state.vPos.y;  // ró¿nica wysokoœci jak¹ trzeba pokonaæ  
+	float h = sry + height / 2 + clearance - state.vPos.y;  // rï¿½nica wysokoï¿½ci jakï¿½ trzeba pokonaï¿½  
 	float V_podbicia = 0;
 	if ((h > 0) && (state.vV.y <= 0.01))
-		V_podbicia = 0.5*sqrt(2 * g*h);  // prêdkoœæ spowodowana podbiciem pojazdu przy wje¿d¿aniu na skarpê 
+		V_podbicia = 0.5*sqrt(2 * g*h);  // prï¿½dkoï¿½ï¿½ spowodowana podbiciem pojazdu przy wjeï¿½dï¿½aniu na skarpï¿½ 
 	if (h > 0) state.vPos.y = sry + height / 2 + clearance;
 
-	// lub  w przypadku zag³êbienia siê 
-	Vector3 dvPos = state.vV*dt + state.vA*dt*dt / 2; // czynnik bardzo ma³y - im wiêksza czêstotliwoœæ symulacji, tym mniejsze znaczenie 
+	// lub  w przypadku zagï¿½ï¿½bienia siï¿½ 
+	Vector3 dvPos = state.vV*dt + state.vA*dt*dt / 2; // czynnik bardzo maï¿½y - im wiï¿½ksza czï¿½stotliwoï¿½ï¿½ symulacji, tym mniejsze znaczenie 
 	state.vPos = state.vPos + dvPos;
 
-	// korekta po³o¿enia w przypadku envu cyklicznego:
+	// korekta poï¿½oï¿½enia w przypadku envu cyklicznego:
 	if (state.vPos.x < -env.field_size*env.number_of_columns / 2) state.vPos.x += env.field_size*env.number_of_columns;
 	else if (state.vPos.x > env.field_size*(env.number_of_columns - env.number_of_columns / 2)) state.vPos.x -= env.field_size*env.number_of_columns;
 	if (state.vPos.z < -env.field_size*env.number_of_rows / 2) state.vPos.z += env.field_size*env.number_of_rows;
 	else if (state.vPos.z > env.field_size*(env.number_of_rows - env.number_of_rows / 2)) state.vPos.z -= env.field_size*env.number_of_rows;
 
-	// Sprawdzenie czy obiekt mo¿e siê przemieœciæ w zadane miejsce: Jeœli nie, to 
-	// przemieszczam obiekt do miejsca zetkniêcia, wyznaczam nowe wektory prêdkoœci
-	// i prêdkoœci k¹towej, a nastêpne obliczam nowe po³o¿enie na podstawie nowych
-	// prêdkoœci i pozosta³ego czasu. Wszystko powtarzam w pêtli (pojazd znowu mo¿e 
-	// wjechaæ na przeszkodê). Problem z zaokr¹glonymi przeszkodami - konieczne 
+	// Sprawdzenie czy obiekt moï¿½e siï¿½ przemieï¿½ciï¿½ w zadane miejsce: Jeï¿½li nie, to 
+	// przemieszczam obiekt do miejsca zetkniï¿½cia, wyznaczam nowe wektory prï¿½dkoï¿½ci
+	// i prï¿½dkoï¿½ci kï¿½towej, a nastï¿½pne obliczam nowe poï¿½oï¿½enie na podstawie nowych
+	// prï¿½dkoï¿½ci i pozostaï¿½ego czasu. Wszystko powtarzam w pï¿½tli (pojazd znowu moï¿½e 
+	// wjechaï¿½ na przeszkodï¿½). Problem z zaokrï¿½glonymi przeszkodami - konieczne 
 	// wyznaczenie minimalnego kroku.
 
 
 	Vector3 vV_pop = state.vV;
 
-	// sk³adam prêdkoœci w ró¿nych kierunkach oraz efekt przyspieszenia w jeden wektor:    (problem z przyspieszeniem od si³y tarcia -> to przyspieszenie 
-	//      mo¿e dzia³aæ krócej ni¿ dt -> trzeba to jakoœ uwzglêdniæ, inaczej pojazd bêdzie wê¿ykowa³)
+	// skï¿½adam prï¿½dkoï¿½ci w rï¿½nych kierunkach oraz efekt przyspieszenia w jeden wektor:    (problem z przyspieszeniem od siï¿½y tarcia -> to przyspieszenie 
+	//      moï¿½e dziaï¿½aï¿½ krï¿½cej niï¿½ dt -> trzeba to jakoï¿½ uwzglï¿½dniï¿½, inaczej pojazd bï¿½dzie wï¿½ykowaï¿½)
 	state.vV = vV_forward.znorm()*V_up + vV_right.znorm()*V_right + vV_up +
 		Vector3(0, 1, 0)*V_podbicia + state.vA*dt;
-	// usuwam te sk³adowe wektora prêdkoœci w których kierunku jazda nie jest mo¿liwa z powodu
-	// przeskód:
-	// np. jeœli pojazd styka siê 3 ko³ami z nawierzchni¹ lub dwoma ko³ami i œrodkiem ciê¿koœci to
-	// nie mo¿e mieæ prêdkoœci w dó³ pod³ogi
+	// usuwam te skï¿½adowe wektora prï¿½dkoï¿½ci w ktï¿½rych kierunku jazda nie jest moï¿½liwa z powodu
+	// przeskï¿½d:
+	// np. jeï¿½li pojazd styka siï¿½ 3 koï¿½ami z nawierzchniï¿½ lub dwoma koï¿½ami i ï¿½rodkiem ciï¿½koï¿½ci to
+	// nie moï¿½e mieï¿½ prï¿½dkoï¿½ci w dï¿½ podï¿½ogi
 	if ((P.y <= Pt.y + height / 2 + clearance) || (Q.y <= Qt.y + height / 2 + clearance) ||
-		(R.y <= Rt.y + height / 2 + clearance) || (S.y <= St.y + height / 2 + clearance))    // jeœli pojazd styka siê co najm. jednym ko³em
+		(R.y <= Rt.y + height / 2 + clearance) || (S.y <= St.y + height / 2 + clearance))    // jeï¿½li pojazd styka siï¿½ co najm. jednym koï¿½em
 	{
 		Vector3 dvV = vV_up + dir_up*(state.vA^dir_up)*dt;
-		if ((dir_up.znorm() - dvV.znorm()).length() > 1)  // jeœli wektor skierowany w dó³ pod³ogi
+		if ((dir_up.znorm() - dvV.znorm()).length() > 1)  // jeï¿½li wektor skierowany w dï¿½ podï¿½ogi
 			state.vV = state.vV - dvV;
 	}
 
-	// sk³adam przyspieszenia liniowe od si³ napêdzaj¹cych i od si³ oporu: 
-	state.vA = (dir_forward*F + dir_right*Fb) / mass_own*(Fy > 0)  // od si³ napêdzaj¹cych
+	// skï¿½adam przyspieszenia liniowe od siï¿½ napï¿½dzajï¿½cych i od siï¿½ oporu: 
+	state.vA = (dir_forward*F + dir_right*Fb) / mass_own*(Fy > 0)  // od siï¿½ napï¿½dzajï¿½cych
 		- vV_forward.znorm()*(Fh / mass_own + friction_roll*Fy / mass_own)*(V_up > 0.01) // od hamowania i tarcia tocznego (w kierunku ruchu)
 		- vV_right.znorm()*friction*Fy / mass_own*(V_right > 0.01)    // od tarcia w kierunku prost. do kier. ruchu
 		+ vAg;           // od grawitacji
@@ -284,7 +284,7 @@ void MovableObject::DrawObject()
 
 	glTranslatef(state.vPos.x, state.vPos.y + clearance, state.vPos.z);
 
-	Vector3 k = state.qOrient.AsixAngle();     // reprezentacja k¹towo-osiowa quaterniona
+	Vector3 k = state.qOrient.AsixAngle();     // reprezentacja kï¿½towo-osiowa quaterniona
 
 	Vector3 k_znorm = k.znorm();
 
@@ -310,7 +310,7 @@ void MovableObject::DrawObject()
 //**********************
 Environment::Environment()
 {
-   field_size = 35;         // d³ugoœæ boku kwadratu w [m]           
+   field_size = 35;         // dï¿½ugoï¿½ï¿½ boku kwadratu w [m]           
 
    int wynik = ReadMap("map.txt");
    if (wynik == 0)
@@ -351,15 +351,15 @@ Environment::~Environment()
          
 }
 
-float Environment::DistFromGround(float x,float z)      // okreœlanie wysokoœci dla punktu o wsp. (x,z) 
+float Environment::DistFromGround(float x,float z)      // okreï¿½lanie wysokoï¿½ci dla punktu o wsp. (x,z) 
 {
   
-  float x_begin = -field_size*number_of_columns/2,     // wspó³rzêdne lewego górnego krañca envu
+  float x_begin = -field_size*number_of_columns/2,     // wspï¿½rzï¿½dne lewego gï¿½rnego kraï¿½ca envu
         z_begin = -field_size*number_of_rows/2;        
   
-  long k = (long)((x - x_begin)/field_size), // wyznaczenie wspó³rzêdnych (w,k) kwadratu
+  long k = (long)((x - x_begin)/field_size), // wyznaczenie wspï¿½rzï¿½dnych (w,k) kwadratu
        w = (long)((z - z_begin)/field_size);
-  //if ((k < 0)||(k >= number_of_rows)||(w < 0)||(w >= number_of_columns)) return -1e10;  // jeœli poza map¹
+  //if ((k < 0)||(k >= number_of_rows)||(w < 0)||(w >= number_of_columns)) return -1e10;  // jeï¿½li poza mapï¿½
 
   // korekta numeru kolumny lub wiersza w przypadku envu cyklicznego
   if (k<0) while (k<0) k += number_of_columns;
@@ -367,17 +367,17 @@ float Environment::DistFromGround(float x,float z)      // okreœlanie wysokoœci 
   if (w<0) while (w<0) w += number_of_rows;
   else if (w > number_of_rows - 1) while (w > number_of_rows - 1) w -= number_of_rows;
   
-  // wyznaczam punkt B - œrodek kwadratu oraz trójk¹t, w którym znajduje siê punkt
+  // wyznaczam punkt B - ï¿½rodek kwadratu oraz trï¿½jkï¿½t, w ktï¿½rym znajduje siï¿½ punkt
   // (rysunek w Environment::DrawInitialisation())
   Vector3 B = Vector3(x_begin + (k+0.5)*field_size, height_map[w*2+1][k], z_begin + (w+0.5)*field_size); 
-  enum tr{ABC=0,ADB=1,BDE=2,CBE=3};       // trójk¹t w którym znajduje siê punkt 
+  enum tr{ABC=0,ADB=1,BDE=2,CBE=3};       // trï¿½jkï¿½t w ktï¿½rym znajduje siï¿½ punkt 
   int triangle=0; 
   if ((B.x > x)&&(fabs(B.z - z) < fabs(B.x - x))) triangle = ADB;
   else if ((B.x < x)&&(fabs(B.z - z) < fabs(B.x - x))) triangle = CBE;
   else if ((B.z > z)&&(fabs(B.z - z) > fabs(B.x - x))) triangle = ABC;
   else triangle = BDE;
   
-  // wyznaczam normaln¹ do p³aszczyzny a nastêpnie wspó³czynnik d z równania p³aszczyzny
+  // wyznaczam normalnï¿½ do pï¿½aszczyzny a nastï¿½pnie wspï¿½czynnik d z rï¿½wnania pï¿½aszczyzny
   float dd = d[w][k][triangle];
   Vector3 N = Norm[w][k][triangle];
   float y;
@@ -389,10 +389,10 @@ float Environment::DistFromGround(float x,float z)      // okreœlanie wysokoœci 
 
 void Environment::DrawInitialisation()
 {
-  // tworze listê wyœwietlania rysuj¹c poszczególne pola mapy za pomoc¹ trójk¹tów 
-  // (po 4 trójk¹ty na ka¿de pole):
+  // tworze listï¿½ wyï¿½wietlania rysujï¿½c poszczegï¿½lne pola mapy za pomocï¿½ trï¿½jkï¿½tï¿½w 
+  // (po 4 trï¿½jkï¿½ty na kaï¿½de pole):
   enum tr{ABC=0,ADB=1,BDE=2,CBE=3};       
-  float x_begin = -field_size*number_of_columns/2,     // wspó³rzêdne lewego górnego krañca envu
+  float x_begin = -field_size*number_of_columns/2,     // wspï¿½rzï¿½dne lewego gï¿½rnego kraï¿½ca envu
         z_begin = -field_size*number_of_rows/2;        
   Vector3 A,B,C,D,E,N;      
   glNewList(EnvironmentMap,GL_COMPILE);
@@ -406,7 +406,7 @@ void Environment::DrawInitialisation()
           C = Vector3(x_begin + (k+1)*field_size, height_map[w*2][k+1], z_begin + w*field_size); 
           D = Vector3(x_begin + k*field_size, height_map[(w+1)*2][k], z_begin + (w+1)*field_size);       
           E = Vector3(x_begin + (k+1)*field_size, height_map[(w+1)*2][k+1], z_begin + (w+1)*field_size); 
-          // tworzê trójk¹t ABC w górnej czêœci kwadratu: 
+          // tworzï¿½ trï¿½jkï¿½t ABC w gï¿½rnej czï¿½ci kwadratu: 
           //  A o_________o C
           //    |.       .|
           //    |  .   .  | 
@@ -422,9 +422,9 @@ void Environment::DrawInitialisation()
 		  glVertex3f( A.x, A.y, A.z);
 		  glVertex3f( B.x, B.y, B.z);
           glVertex3f( C.x, C.y, C.z);
-          d[w][k][ABC] = -(B^N);          // dodatkowo wyznaczam wyraz wolny z równania plaszyzny trójk¹ta
-          Norm[w][k][ABC] = N;          // dodatkowo zapisujê normaln¹ do p³aszczyzny trójk¹ta
-          // trójk¹t ADB:
+          d[w][k][ABC] = -(B^N);          // dodatkowo wyznaczam wyraz wolny z rï¿½wnania plaszyzny trï¿½jkï¿½ta
+          Norm[w][k][ABC] = N;          // dodatkowo zapisujï¿½ normalnï¿½ do pï¿½aszczyzny trï¿½jkï¿½ta
+          // trï¿½jkï¿½t ADB:
           Vector3 AD = D-A;
           N = (AD*AB).znorm();          
           glNormal3f( N.x, N.y, N.z);
@@ -433,7 +433,7 @@ void Environment::DrawInitialisation()
 		  glVertex3f( B.x, B.y, B.z);
 		  d[w][k][ADB] = -(B^N);       
           Norm[w][k][ADB] = N;
-		  // trójk¹t BDE:
+		  // trï¿½jkï¿½t BDE:
           Vector3 BD = D-B;
           Vector3 DE = E-D;
           N = (BD*DE).znorm();          
@@ -443,7 +443,7 @@ void Environment::DrawInitialisation()
           glVertex3f( E.x, E.y, E.z);  
           d[w][k][BDE] = -(B^N);        
           Norm[w][k][BDE] = N;  
-          // trójk¹t CBE:
+          // trï¿½jkï¿½t CBE:
           Vector3 CB = B-C;
           Vector3 BE = E-B;
           N = (CB*BE).znorm();          
@@ -460,14 +460,14 @@ void Environment::DrawInitialisation()
                  
 }
 
-// wczytanie powierzchni terenu (mapy wysokoœci) oraz przedmiotów  
+// wczytanie powierzchni terenu (mapy wysokoï¿½ci) oraz przedmiotï¿½w  
 int Environment::ReadMap(char filename[128])
 {
 	int mode_reading_things = 0, mode_reading_map = 0, mode_reading_row = 0,
-		nr_of_row_point = -1, nr_of_column_point = -1;   // liczby wierszy i kolumn punktów 
+		nr_of_row_point = -1, nr_of_column_point = -1;   // liczby wierszy i kolumn punktï¿½w 
 	height_map = NULL;
    
-	this->number_of_rows = this->number_of_columns = 0;  // liczby wierszy i kolumn czwórek trójk¹tów
+	this->number_of_rows = this->number_of_columns = 0;  // liczby wierszy i kolumn czwï¿½rek trï¿½jkï¿½tï¿½w
 
 	FILE *pl = fopen(filename, "r");
 
@@ -525,9 +525,9 @@ int Environment::ReadMap(char filename[128])
 					}
 				}
 
-			} // tryb odczytu mapy wierzcho³ków
+			} // tryb odczytu mapy wierzchoï¿½kï¿½w
 
-			// pamiêæ dla mapy terenu:
+			// pamiï¿½ï¿½ dla mapy terenu:
 			if ((this->number_of_rows > 0) && (this->number_of_columns > 0) && (height_map == NULL))
 			{
 				height_map = new float*[number_of_rows * 2 + 1];

@@ -1,41 +1,36 @@
-//++++
 /****************************************************
-	Virtual Collaborative Teams - The base program
-	The main module
+	Virtual Collaborative Teams - The base program 
+    The main module
 	****************************************************/
 
 #include <windows.h>
 #include <math.h>
 #include <time.h>
+#include <float.h>
 #include <gl\gl.h>
 #include <gl\glu.h>
 #include <iterator> 
 #include <map>
+#include <vector>
 
 #include "objects.h"
 #include "graphics.h"
 #include "net.h"
 using namespace std;
 
-//++++
-#define SERVER_IP "192.168.0.157"
+#define SERVER_IP "172.20.14.180"
 bool is_server = false;
 unicast_net* uni_reciv;
 unicast_net* uni_send;
-//====
 
-HANDLE threadReciv;                  // uchwyt wπtku odbioru komunikatÛw
-HWND main_window;                    // uchwyt do g≥Ûwnego okna programu 
-CRITICAL_SECTION m_cs;               // do synchronizacji wπtkÛw
-
-//++++
 map<unsigned long, clock_t> clients; // dla serwera: mapa IP klientow -> czas ostatniej aktywnosci
-//====
 
-FILE* f = fopen("wzr_log.txt", "w"); // plik do zapisu informacji testowych
+FILE *f = fopen("vct_log.txt", "w"); // plik do zapisu informacji testowych
 
+bool client_spawn_position_received = false;  // Flag to track if spawn position is received
+Vector3 client_spawn_position;                // Variable to store the spawn position received from the server
 
-MovableObject* my_car;               // obiekt przypisany do tej aplikacji
+MovableObject *my_car;               // obiekt przypisany do tej aplikacji
 Environment env;
 
 map<int, MovableObject*> other_cars;
@@ -44,127 +39,318 @@ float avg_cycle_time;                // sredni czas pomiedzy dwoma kolejnymi cyk
 long time_of_cycle, number_of_cyc;   // zmienne pomocnicze potrzebne do obliczania avg_cycle_time
 long time_start = clock();
 
+HANDLE threadReciv;                  // uchwyt wƒÖtku odbioru komunikat√≥w
+HWND main_window;                    // uchwyt do g≈Ç√≥wnego okna programu 
+CRITICAL_SECTION m_cs;               // do synchronizacji wƒÖtk√≥w
+
 bool if_SHIFT_pressed = false;
-bool if_ID_visible = true;           // czy rysowac nr ID przy kaødym obiekcie
-bool if_mouse_control = false;       // sterowanie za pomocπ klawisza myszki
-int mouse_cursor_x = 0, mouse_cursor_y = 0;     // po≥oøenie kursora myszy
+bool if_ID_visible = true;           // czy rysowac nr ID przy ka≈ºdym obiekcie
+bool if_mouse_control = false;       // sterowanie za pomocƒÖ klawisza myszki
+int mouse_cursor_x = 0, mouse_cursor_y = 0;     // po≈Ço≈ºenie kursora myszy
+
+// false until my_car's spawn position has been set from an existing car
+bool my_car_spawned = false;
+
+// clock() tick when the first foreign car was first seen (0 = not yet seen)
+long spawn_settle_start = 0;
+
+// how long to wait after seeing the first car before picking a spawn position [ms]
+const long spawn_settle_ms = 500;
+
+// minimum spawn distance from any other car [m]; map is ~8084x8084
+const float spawn_distance = 10.0f;
+
+// network frame types
+const int FRAME_TYPE_STATE = 1;
+const int FRAME_TYPE_SPAWN = 2;
+const int FRAME_TYPE_DELETE = 3;
+
+// server-side inactivity timeout
+const clock_t client_timeout_ticks = 5 * CLOCKS_PER_SEC;
 
 extern ViewParams viewpar;           // ustawienia widoku zdefiniowane w grafice
 
 long duration_of_day = 800;         // czas trwania dnia w [s]
 
-struct Frame                                      // g≥Ûwna struktura s≥uøπca do przesy≥ania informacji
-{
-	int iID;                                      // identyfikator obiektu, ktÛrego 
-	int type;                                     // typ ramki: informacja o stateie, informacja o zamkniÍciu, komunikat tekstowy, ... 
-	ObjectState state;                            // po≥oøenie, prÍdkoúÊ: úrodka masy + kπtowe, ...
+struct Frame                                      // g≈Ç√≥wna struktura s≈Çu≈ºƒÖca do przesy≈Çania informacji
+{	
+	int iID;                                      // identyfikator obiektu, kt√≥rego 
+	int type;                                     // typ ramki: informacja o stateie, informacja o zamkniƒôciu, komunikat tekstowy, ... 
+	ObjectState state;                            // po≈Ço≈ºenie, prƒôdko≈õƒá: ≈õrodka masy + kƒÖtowe, ...
 
-	long sending_time;                            // tzw. znacznik czasu potrzebny np. do obliczenia opÛünienia
-	int iID_receiver;                             // nr ID odbiorcy wiadomoúci, jeúli skierowana jest tylko do niego
+	long sending_time;                            // tzw. znacznik czasu potrzebny np. do obliczenia op√≥≈∫nienia
+	int iID_receiver;                             // nr ID odbiorcy wiadomo≈õci, je≈õli skierowana jest tylko do niego
 };
 
-//++++
-// Funkcja wπtku serwera
+Vector3 CalculateBestSpawnPosition(const std::map<unsigned long, MovableObject*>& other_cars, const Vector3& fallback_pos, unsigned long ignored_ip);
+
 DWORD WINAPI ServerThreadFun(void* ptr)
 {
 	unicast_net* s_reciv = new unicast_net(1001);
 	unicast_net* s_send = new unicast_net(1002);
 	Frame frame;
 	unsigned long senderIP;
+	map<unsigned long, int> client_ids;
+
+	// Map to store positions of other cars
+	std::map<unsigned long, MovableObject*> other_cars;
 
 	while (1)
 	{
 		int bytes = s_reciv->reciv((char*)&frame, &senderIP, sizeof(Frame));
 		if (bytes == sizeof(Frame))
 		{
-			clients[senderIP] = clock(); // rejestracja/aktualizacja klienta
-
-			// Rozsy≥anie do wszystkich aktywnych klientÛw
-			for (auto it = clients.begin(); it != clients.end(); )
+			if (frame.type != FRAME_TYPE_STATE)
 			{
-				if (clock() - it->second > 5 * CLOCKS_PER_SEC) // usun nieaktywne klientÛw po 5s
+				continue;
+			}
+
+			clock_t now = clock();
+			bool is_new_client = (clients.find(senderIP) == clients.end());
+
+			// Register or update the client
+			clients[senderIP] = now;
+			client_ids[senderIP] = frame.iID;
+
+			// Update the position of the sender's car
+			MovableObject* sender_car = NULL;
+			auto sender_it = other_cars.find(senderIP);
+			if (sender_it == other_cars.end())
+			{
+				sender_car = new MovableObject();
+				sender_car->iID = frame.iID;
+				other_cars[senderIP] = sender_car;
+			}
+			else
+			{
+				sender_car = sender_it->second;
+			}
+			sender_car->ChangeState(frame.state);  // Update the car's state (position, etc.)
+
+			// For a new client, server assigns an authoritative spawn position once.
+			if (is_new_client)
+			{
+				Vector3 spawn_pos = CalculateBestSpawnPosition(other_cars, frame.state.vPos, senderIP);
+				ObjectState spawned_state = frame.state;
+				spawned_state.vPos = spawn_pos;
+				sender_car->ChangeState(spawned_state);
+
+				Frame spawn_frame = frame;
+				spawn_frame.type = FRAME_TYPE_SPAWN;
+				spawn_frame.state = spawned_state;
+				s_send->send((char*)&spawn_frame, senderIP, sizeof(Frame));
+
+				// Broadcast state with authoritative spawn position.
+				frame.state = spawned_state;
+			}
+
+			frame.type = FRAME_TYPE_STATE;
+
+			// Broadcast the updated state to all clients.
+			for (auto it = clients.begin(); it != clients.end(); ++it)
+			{
+				s_send->send((char*)&frame, it->first, sizeof(Frame));
+			}
+
+			// Detect and remove inactive clients.
+			vector<unsigned long> timed_out_ips;
+			for (auto it = clients.begin(); it != clients.end(); ++it)
+			{
+				if (now - it->second > client_timeout_ticks)
 				{
-					printf("Usunieto nieaktywnego klienta: %lu\n", it->first);
-					it = clients.erase(it);
+					timed_out_ips.push_back(it->first);
 				}
-				else
+			}
+
+			for (size_t i = 0; i < timed_out_ips.size(); ++i)
+			{
+				unsigned long dead_ip = timed_out_ips[i];
+				int dead_id = 0;
+				auto id_it = client_ids.find(dead_ip);
+				if (id_it != client_ids.end())
 				{
-					s_send->send((char*)&frame, it->first, sizeof(Frame)); // retransmisja do klienta
-					++it;
+					dead_id = id_it->second;
+				}
+
+				printf("Removed inactive client: %lu (car id: %d)\n", dead_ip, dead_id);
+
+				auto car_it = other_cars.find(dead_ip);
+				if (car_it != other_cars.end())
+				{
+					delete car_it->second;
+					other_cars.erase(car_it);
+				}
+
+				clients.erase(dead_ip);
+				client_ids.erase(dead_ip);
+
+				if (dead_id != 0)
+				{
+					Frame delete_frame = {};
+					delete_frame.type = FRAME_TYPE_DELETE;
+					delete_frame.iID = dead_id;
+					for (auto it = clients.begin(); it != clients.end(); ++it)
+					{
+						s_send->send((char*)&delete_frame, it->first, sizeof(Frame));
+					}
 				}
 			}
 		}
 	}
 	return 1;
 }
-//====
 
+// Function to calculate the best spawn position for a new car
+Vector3 CalculateBestSpawnPosition(const std::map<unsigned long, MovableObject*>& other_cars, const Vector3& fallback_pos, unsigned long ignored_ip)
+{
+	std::vector<Vector3> positions;
+	for (auto& kv : other_cars)
+	{
+		if (kv.first == ignored_ip) continue;
+		if (kv.second) positions.push_back(kv.second->State().vPos);
+	}
+
+	if (positions.empty())
+	{
+		return fallback_pos;
+	}
+
+	// Take the first car position as a reference
+	Vector3 ref = positions[0];
+
+	// Constants
+	const int max_tries = 36;
+
+	// Try generating positions
+	for (int i = 0; i < max_tries; i++)
+	{
+		// Random angle generation
+		float angle = (float)i * (2.0f * (float)M_PI / max_tries)
+			+ ((float)(rand() % 100) / 100.0f) * 0.1f;
+		Vector3 candidate;
+		candidate.x = ref.x + spawn_distance * cosf(angle);
+		candidate.z = ref.z + spawn_distance * sinf(angle);
+		candidate.y = ref.y; // Assume height is managed by simulation
+
+		// Check the distances
+		bool valid = true;
+		float closest_dist = FLT_MAX;
+		for (auto& p : positions)
+		{
+			float dx = candidate.x - p.x;
+			float dz = candidate.z - p.z;
+			float dist = sqrtf(dx * dx + dz * dz);
+
+			// If any car is too close, mark as invalid
+			if (dist < spawn_distance)
+			{
+				valid = false;
+				break;
+			}
+
+			// Track the closest car distance
+			if (dist < closest_dist)
+			{
+				closest_dist = dist;
+			}
+		}
+
+		// If the closest car is exactly spawn_distance, and all cars are far enough, accept the candidate
+		if (valid && closest_dist >= spawn_distance)
+		{
+			return candidate;
+		}
+	}
+
+	// Return a fallback spawn if no valid position found after max tries (could be ref or another fallback)
+	return fallback_pos;
+}
 //******************************************
-// Funkcja obs≥ugi wπtku odbioru komunikatÛw 
-// UWAGA!  Odbierane sπ teø komunikaty z w≥asnej aplikacji by porÛwnaÊ obraz ekstrapolowany do rzeczywistego.
+// Funkcja obs≈Çugi wƒÖtku odbioru komunikat√≥w 
+// UWAGA!  Odbierane sƒÖ te≈º komunikaty z w≈Çasnej aplikacji by por√≥wnaƒá obraz ekstrapolowany do rzeczywistego.
 DWORD WINAPI ReceiveThreadFun(void* ptr)
 {
-	//++++
-	unicast_net* pmt_net = (unicast_net*)ptr;  // wskaünik do obiektu klasy unicast_net
+	unicast_net* pmt_net = (unicast_net*)ptr;  // Pointer to unicast_net
 	Frame frame;
 	unsigned long senderIP;
 
 	while (1)
 	{
-		int frame_size = pmt_net->reciv((char*)&frame, &senderIP, sizeof(Frame));   // oczekiwanie na nadejúcie ramki 
-		ObjectState state = frame.state;
-		//====
-
-				//fprintf(f, "odebrano stan iID = %d, ID dla mojego obiektu = %d\n", frame.iID, my_car->iID);
-
-				// Lock the Critical section
-		EnterCriticalSection(&m_cs);               // wejúcie na úcieøkÍ krytycznπ - by inne wπtki (np. g≥Ûwny) nie wspÛ≥dzieli≥ 
-		// tablicy other_cars
-		if ((frame.iID != my_car->iID) && (frame.iID >= 100))      // jeúli to nie mÛj w≥asny obiekt ani obiekt specjalny
+		int frame_size = pmt_net->reciv((char*)&frame, &senderIP, sizeof(Frame));   // Wait for frame
+		if (frame_size != sizeof(Frame))
 		{
+			continue;
+		}
+		ObjectState state = frame.state;
 
-			if ((other_cars.size() == 0) || (other_cars[frame.iID] == NULL))        // nie ma jeszcze takiego obiektu w tablicy -> trzeba go
-				// stworzyÊ
+		EnterCriticalSection(&m_cs);  // Enter critical section to modify shared resources
+
+		if (frame.type == FRAME_TYPE_DELETE)
+		{
+			if (frame.iID != my_car->iID)
+			{
+				auto it = other_cars.find(frame.iID);
+				if (it != other_cars.end())
+				{
+					delete it->second;
+					other_cars.erase(it);
+				}
+			}
+			LeaveCriticalSection(&m_cs);
+			continue;
+		}
+
+		if (frame.type == FRAME_TYPE_SPAWN && frame.iID == my_car->iID && !client_spawn_position_received)
+		{
+			client_spawn_position = frame.state.vPos;
+			client_spawn_position_received = true;
+			LeaveCriticalSection(&m_cs);
+			continue;
+		}
+
+		if (frame.type != FRAME_TYPE_STATE)
+		{
+			LeaveCriticalSection(&m_cs);
+			continue;
+		}
+
+		if (frame.iID != my_car->iID)  // If this is not the client's own object
+		{
+			if ((other_cars.size() == 0) || (other_cars[frame.iID] == NULL))
 			{
 				MovableObject* ob = new MovableObject();
 				ob->iID = frame.iID;
 				other_cars[frame.iID] = ob;
-				//fprintf(f, "zarejestrowano %d obcy obiekt o ID = %d\n", iLiczbaCudzychOb - 1, CudzeObiekty[iLiczbaCudzychOb]->iID);
 			}
-			other_cars[frame.iID]->ChangeState(state);   // aktualizacja stateu obiektu obcego 	
-
+			other_cars[frame.iID]->ChangeState(state);   // Update the state of foreign objects
 		}
-		//Release the Critical section
-		LeaveCriticalSection(&m_cs);               // wyjúcie ze úcieøki krytycznej
-	}  // while(1)
+		LeaveCriticalSection(&m_cs);  // Exit critical section
+	}
 	return 1;
 }
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiÊ podczas uruchamiania aplikacji
-// ****    poza grafikπ   
+// ****    Wszystko co trzeba zrobiƒá podczas uruchamiania aplikacji
+// ****    poza grafikƒÖ   
 void InteractionInitialisation()
 {
 	DWORD dwThreadId;
 
-	//++++
-	is_server = (MessageBox(NULL, "Czy ta aplikacja to serwer?", "WybÛr roli", MB_YESNO) == IDYES);
+	is_server = (MessageBox(NULL, "Czy ta aplikacja to serwer?", "Wyb√≥r roli", MB_YESNO) == IDYES);
 
 	if (is_server) {
 		CreateThread(NULL, 0, ServerThreadFun, NULL, 0, &dwThreadId);
 	}
-	//====
 
 	my_car = new MovableObject();    // tworzenie wlasnego obiektu
 
 	time_of_cycle = clock();             // pomiar aktualnego czasu
 
-	//++++
-		// obiekty sieciowe typu unicast
+	// obiekty sieciowe typu unicast
 	uni_reciv = new unicast_net(1002);      // klient odbiera na 1002
-	uni_send = new unicast_net(1001);       // klient wysy≥a do serwera (port 1001)
+	uni_send = new unicast_net(1001);       // klient wysy≈Ça do serwera (port 1001)
 
-	// uruchomienie wπtku obs≥ugujπcego odbiÛr komunikatÛw:
+	// uruchomienie wƒÖtku obs≈ÇugujƒÖcego odbi√≥r komunikat√≥w:
 	threadReciv = CreateThread(
 		NULL,                        // no security attributes
 		0,                           // use default stack size
@@ -172,7 +358,6 @@ void InteractionInitialisation()
 		(void*)uni_reciv,               // argument to thread function
 		NULL,                        // use default creation flags
 		&dwThreadId);                // returns the thread identifier
-	//====
 	SetThreadPriority(threadReciv, THREAD_PRIORITY_HIGHEST);
 
 	printf("start interakcji\n");
@@ -180,39 +365,50 @@ void InteractionInitialisation()
 
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiÊ w kaødym cyklu dzia≥ania 
-// ****    aplikacji poza grafikπ 
+// ****    Wszystko co trzeba zrobiƒá w ka≈ºdym cyklu dzia≈Çania 
+// ****    aplikacji poza grafikƒÖ 
 void VirtualWorldCycle()
 {
 	number_of_cyc++;
 
-	if (number_of_cyc % 50 == 0)          // jeúli licznik cykli przekroczy≥ pewnπ wartoúÊ, to
-	{                              // naleøy na nowo obliczyÊ úredni czas cyklu avg_cycle_time
+	// --- Handle the spawn positioning now decided by the server ---
+	if (!my_car_spawned)
+	{
+		EnterCriticalSection(&m_cs);
+		if (client_spawn_position_received)
+		{
+			my_car->state.vPos = client_spawn_position;
+			my_car_spawned = true;
+		}
+		LeaveCriticalSection(&m_cs);
+	}
+
+	if (number_of_cyc % 50 == 0)          // je≈õli licznik cykli przekroczy≈Ç pewnƒÖ warto≈õƒá, to
+	{                              // nale≈ºy na nowo obliczyƒá ≈õredni czas cyklu avg_cycle_time
 		char text[256];
 		long prev_time = time_of_cycle;
 		time_of_cycle = clock();
 		float fFps = (50 * CLOCKS_PER_SEC) / (float)(time_of_cycle - prev_time);
 		if (fFps != 0) avg_cycle_time = 1.0 / fFps; else avg_cycle_time = 1;
 
-		sprintf(text, "WZR-lab lato 2025/26 temat 1, wersja a (%0.0f fps  %0.2fms) ", fFps, 1000.0 / fFps);
+		sprintf(text, "WZR-lab 2025/26 (lato) temat 1, wersja g (car_id:%d, %0.0f fps  %0.2fms, x:%0.2f, y:%0.2f, z:%0.2f) ", my_car->iID, fFps, 1000.0 / fFps, my_car->state.vPos.x, my_car->state.vPos.y, my_car->state.vPos.z);
 
-		SetWindowText(main_window, text); // wyúwietlenie aktualnej iloúci klatek/s w pasku okna			
+		SetWindowText(main_window, text); // wy≈õwietlenie aktualnej ilo≈õci klatek/s w pasku okna			
 	}
 
-	my_car->Simulation(avg_cycle_time);                    // symulacja w≥asnego obiektu
+	my_car->Simulation(avg_cycle_time);                    // symulacja w≈Çasnego obiektu
 
 	Frame frame;
-	frame.state = my_car->State();               // state w≥asnego obiektu 
+	frame.state = my_car->State();               // state w≈Çasnego obiektu 
 	frame.iID = my_car->iID;
+	frame.type = FRAME_TYPE_STATE;
 
-	//++++
-	uni_send->send((char*)&frame, (char*)SERVER_IP, sizeof(Frame));  // wys≥anie komunikatu do serwera
-	//====
+	uni_send->send((char*)&frame, (char*)SERVER_IP, sizeof(Frame));  // wys≈Çanie komunikatu do serwera
 }
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiÊ podczas zamykania aplikacji
-// ****    poza grafikπ 
+// ****    Wszystko co trzeba zrobiƒá podczas zamykania aplikacji
+// ****    poza grafikƒÖ 
 void EndOfInteraction()
 {
 	fprintf(f, "Koniec interakcji\n");
@@ -232,20 +428,20 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	LPSTR     lpCmdLine,
 	int       nCmdShow)
 {
-
+	
 	//Initilze the critical section
 	InitializeCriticalSection(&m_cs);
 
 	MSG message;		  //innymi slowy "komunikat"
-	WNDCLASS main_class; //klasa g≥Ûwnego okna aplikacji
+	WNDCLASS main_class; //klasa g≈Ç√≥wnego okna aplikacji
 
 	static char class_name[] = "Klasa_Podstawowa";
 
-	//Definiujemy klase g≥Ûwnego okna aplikacji
-	//Okreslamy tu wlasciwosci okna, szczegÛ≥y wyglπdu oraz
+	//Definiujemy klase g≈Ç√≥wnego okna aplikacji
+	//Okreslamy tu wlasciwosci okna, szczeg√≥≈Çy wyglƒÖdu oraz
 	//adres funkcji przetwarzajacej komunikaty
 	main_class.style = CS_HREDRAW | CS_VREDRAW;
-	main_class.lpfnWndProc = WndProc; //adres funkcji realizujπcej przetwarzanie meldunkÛw 
+	main_class.lpfnWndProc = WndProc; //adres funkcji realizujƒÖcej przetwarzanie meldunk√≥w 
 	main_class.cbClsExtra = 0;
 	main_class.cbWndExtra = 0;
 	main_class.hInstance = hInstance; //identyfikator procesu przekazany przez MS Windows podczas uruchamiania programu
@@ -255,21 +451,21 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	main_class.lpszMenuName = "Menu";
 	main_class.lpszClassName = class_name;
 
-	//teraz rejestrujemy klasÍ okna g≥Ûwnego
+	//teraz rejestrujemy klasƒô okna g≈Ç√≥wnego
 	RegisterClass(&main_class);
 
-	main_window = CreateWindow(class_name, "WZR-lab lato 2025/26 temat 1 - wersja a", WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+	main_window = CreateWindow(class_name, "WZR-lab 2025/26 (lato) temat 1 - wersja g", WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
 		100, 50, 950, 650, NULL, NULL, hInstance, NULL);
 
-
+	
 
 	ShowWindow(main_window, nCmdShow);
 
 	//odswiezamy zawartosc okna
 	UpdateWindow(main_window);
 
-	// pobranie komunikatu z kolejki jeúli funkcja PeekMessage zwraca wartoúÊ innπ niø FALSE,
-	// w przeciwnym wypadku symulacja wirtualnego úwiata wraz z wizualizacjπ
+	// pobranie komunikatu z kolejki je≈õli funkcja PeekMessage zwraca warto≈õƒá innƒÖ ni≈º FALSE,
+	// w przeciwnym wypadku symulacja wirtualnego ≈õwiata wraz z wizualizacjƒÖ
 	ZeroMemory(&message, sizeof(message));
 	while (message.message != WM_QUIT)
 	{
@@ -280,7 +476,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		}
 		else
 		{
-			VirtualWorldCycle();    // Cykl wirtualnego úwiata
+			VirtualWorldCycle();    // Cykl wirtualnego ≈õwiata
 			InvalidateRect(main_window, NULL, FALSE);
 		}
 	}
@@ -289,13 +485,13 @@ int WINAPI WinMain(HINSTANCE hInstance,
 }
 
 /********************************************************************
-FUNKCJA OKNA realizujaca przetwarzanie meldunkÛw kierowanych do okna aplikacji*/
+FUNKCJA OKNA realizujaca przetwarzanie meldunk√≥w kierowanych do okna aplikacji*/
 LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPARAM lParam)
 {
 
 	switch (message_code)
 	{
-	case WM_CREATE:  //message wysy≥any w momencie tworzenia okna
+	case WM_CREATE:  //message wysy≈Çany w momencie tworzenia okna
 	{
 
 		g_context = GetDC(main_window);
@@ -344,7 +540,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		return 0;
 	}
 
-	case WM_DESTROY: //obowiπzkowa obs≥uga meldunku o zamkniÍciu okna
+	case WM_DESTROY: //obowiƒÖzkowa obs≈Çuga meldunku o zamkniƒôciu okna
 
 		EndOfInteraction();
 		EndOfGraphics();
@@ -355,13 +551,13 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		//LPDWORD lpExitCode;
 		DWORD ExitCode;
 		GetExitCodeThread(threadReciv, &ExitCode);
-		TerminateThread(threadReciv, ExitCode);
+		TerminateThread(threadReciv,ExitCode);
 		//ExitThread(ExitCode);
 
 		//Sleep(1000);
 
 		other_cars.clear();
-
+		
 
 		PostQuitMessage(0);
 		return 0;
@@ -371,7 +567,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		int x = LOWORD(lParam);
 		int y = HIWORD(lParam);
 		if (if_mouse_control)
-			my_car->F = 30.0;        // si≥a pchajπca do przodu
+			my_car->F = 30.0;        // si≈Ça pchajƒÖca do przodu
 		break;
 	}
 	case WM_RBUTTONDOWN: //reakcja na prawy przycisk myszki
@@ -379,10 +575,10 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		int x = LOWORD(lParam);
 		int y = HIWORD(lParam);
 		if (if_mouse_control)
-			my_car->F = -5.0;        // si≥a pchajπca do tylu
+			my_car->F = -5.0;        // si≈Ça pchajƒÖca do tylu
 		break;
 	}
-	case WM_MBUTTONDOWN: //reakcja na úrodkowy przycisk myszki : uaktywnienie/dezaktywacja sterwania myszkowego
+	case WM_MBUTTONDOWN: //reakcja na ≈õrodkowy przycisk myszki : uaktywnienie/dezaktywacja sterwania myszkowego
 	{
 		if_mouse_control = 1 - if_mouse_control;
 		if (if_mouse_control) my_car->if_keep_steer_wheel = true;
@@ -395,13 +591,13 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 	case WM_LBUTTONUP: //reakcja na puszczenie lewego przycisku myszki
 	{
 		if (if_mouse_control)
-			my_car->F = 0.0;        // si≥a pchajπca do przodu
+			my_car->F = 0.0;        // si≈Ça pchajƒÖca do przodu
 		break;
 	}
 	case WM_RBUTTONUP: //reakcja na puszczenie lewy przycisk myszki
 	{
 		if (if_mouse_control)
-			my_car->F = 0.0;        // si≥a pchajπca do przodu
+			my_car->F = 0.0;        // si≈Ça pchajƒÖca do przodu
 		break;
 	}
 	case WM_MOUSEMOVE:
@@ -413,7 +609,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			float wheel_angle = (float)(mouse_cursor_x - x) / 20;
 			if (wheel_angle > 60) wheel_angle = 60;
 			if (wheel_angle < -60) wheel_angle = -60;
-			my_car->state.steering_angle = PI * wheel_angle / 180;
+			my_car->state.steering_angle = PI*wheel_angle / 180;
 			//my_car->steer_wheel_speed = (float)(mouse_cursor_x - x) / 20;
 		}
 		break;
@@ -430,41 +626,41 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		}
 		case VK_SPACE:
 		{
-			my_car->breaking_factor = 1.0;       // stopieÒ hamowania (reszta zaleøy od si≥y docisku i wsp. tarcia)
-			break;                       // 1.0 to maksymalny stopieÒ (np. zablokowanie kÛ≥)
+			my_car->breaking_factor = 1.0;       // stopie≈Ñ hamowania (reszta zale≈ºy od si≈Çy docisku i wsp. tarcia)
+			break;                       // 1.0 to maksymalny stopie≈Ñ (np. zablokowanie k√≥≈Ç)
 		}
 		case VK_UP:
 		{
-			my_car->F = 100.0;        // si≥a pchajπca do przodu
+			my_car->F = 200.0;        // si≈Ça pchajƒÖca do przodu
 			break;
 		}
 		case VK_DOWN:
 		{
-			my_car->F = -70.0;
+			my_car->F = -140.0;
 			break;
 		}
 		case VK_LEFT:
 		{
-			if (my_car->steer_wheel_speed < 0) {
+			if (my_car->steer_wheel_speed < 0){
 				my_car->steer_wheel_speed = 0;
 				my_car->if_keep_steer_wheel = true;
 			}
-			else {
-				if (if_SHIFT_pressed) my_car->steer_wheel_speed = 0.5;
-				else my_car->steer_wheel_speed = 0.25 / 8;
+			else{
+				if (if_SHIFT_pressed) my_car->steer_wheel_speed = 1.0;
+				else my_car->steer_wheel_speed = 0.25 / 4;
 			}
 
 			break;
 		}
 		case VK_RIGHT:
 		{
-			if (my_car->steer_wheel_speed > 0) {
+			if (my_car->steer_wheel_speed > 0){
 				my_car->steer_wheel_speed = 0;
 				my_car->if_keep_steer_wheel = true;
 			}
-			else {
-				if (if_SHIFT_pressed) my_car->steer_wheel_speed = -0.5;
-				else my_car->steer_wheel_speed = -0.25 / 8;
+			else{
+				if (if_SHIFT_pressed) my_car->steer_wheel_speed = -1.0;
+				else my_car->steer_wheel_speed = -0.25 / 4;
 			}
 			break;
 		}
@@ -480,14 +676,14 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			else viewpar.cam_distance = 0;
 			break;
 		}
-		case 'S':   // przybliøenie widoku
+		case 'S':   // przybli≈ºenie widoku
 		{
 			//cam_pos = cam_pos + cam_direct*0.3; 
 			if (viewpar.cam_distance > 0) viewpar.cam_distance *= 1.2;
 			else viewpar.cam_distance = 0.5;
 			break;
 		}
-		case 'Q':   // widok z gÛry
+		case 'Q':   // widok z g√≥ry
 		{
 			if (viewpar.tracking) break;
 			viewpar.top_view = 1 - viewpar.top_view;
@@ -507,17 +703,17 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			}
 			break;
 		}
-		case 'E':   // obrÛt kamery ku gÛrze (wzglÍdem lokalnej osi z)
+		case 'E':   // obr√≥t kamery ku g√≥rze (wzglƒôdem lokalnej osi z)
 		{
 			viewpar.cam_angle += PI * 5 / 180;
 			break;
 		}
-		case 'D':   // obrÛt kamery ku do≥owi (wzglÍdem lokalnej osi z)
+		case 'D':   // obr√≥t kamery ku do≈Çowi (wzglƒôdem lokalnej osi z)
 		{
 			viewpar.cam_angle -= PI * 5 / 180;
 			break;
 		}
-		case 'A':   // w≥πczanie, wy≥πczanie trybu úledzenia obiektu
+		case 'A':   // w≈ÇƒÖczanie, wy≈ÇƒÖczanie trybu ≈õledzenia obiektu
 		{
 			viewpar.tracking = 1 - viewpar.tracking;
 			if (viewpar.tracking)
@@ -533,7 +729,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			}
 			break;
 		}
-		case 'Z':   // zoom - zmniejszenie kπta widzenia
+		case 'Z':   // zoom - zmniejszenie kƒÖta widzenia
 		{
 			viewpar.zoom /= 1.1;
 			RECT rc;
@@ -541,7 +737,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			WindowResize(rc.right - rc.left, rc.bottom - rc.top);
 			break;
 		}
-		case 'X':   // zoom - zwiÍkszenie kπta widzenia
+		case 'X':   // zoom - zwiƒôkszenie kƒÖta widzenia
 		{
 			viewpar.zoom *= 1.1;
 			RECT rc;
@@ -610,17 +806,15 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		case VK_LEFT:
 		{
 			my_car->Fb = 0.00;
-			//my_car->state.steering_angle = 0;
-			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = -0.25 / 8;
-			else my_car->steer_wheel_speed = 0;
+			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = -0.25/4;
+			else my_car->steer_wheel_speed = 0; 
 			my_car->if_keep_steer_wheel = false;
 			break;
 		}
 		case VK_RIGHT:
 		{
 			my_car->Fb = 0.00;
-			//my_car->state.steering_angle = 0;
-			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = 0.25 / 8;
+			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = 0.25 / 4;
 			else my_car->steer_wheel_speed = 0;
 			my_car->if_keep_steer_wheel = false;
 			break;
@@ -631,7 +825,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		break;
 	}
 
-	default: //statedardowa obs≥uga pozosta≥ych meldunkÛw
+	default: //statedardowa obs≈Çuga pozosta≈Çych meldunk√≥w
 		return DefWindowProc(main_window, message_code, wParam, lParam);
 	}
 
