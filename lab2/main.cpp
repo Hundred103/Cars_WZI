@@ -1,6 +1,7 @@
+//++++
 /****************************************************
-	Virtual Collaborative Teams - The base program 
-    The main module
+	Virtual Collaborative Teams - The base program
+	The main module
 	****************************************************/
 
 #include <windows.h>
@@ -16,21 +17,25 @@
 #include "net.h"
 using namespace std;
 
+//++++
 #define SERVER_IP "192.168.0.157"
 bool is_server = false;
-unicast_net *uni_reciv;
-unicast_net *uni_send;
+unicast_net* uni_reciv;
+unicast_net* uni_send;
+//====
 
 HANDLE threadReciv;                  // uchwyt w¹tku odbioru komunikatów
 HWND main_window;                    // uchwyt do g³ównego okna programu 
 CRITICAL_SECTION m_cs;               // do synchronizacji w¹tków
 
+//++++
 map<unsigned long, clock_t> clients; // dla serwera: mapa IP klientow -> czas ostatniej aktywnosci
+//====
 
-FILE *f = fopen("wzr_log.txt", "w"); // plik do zapisu informacji testowych
+FILE* f = fopen("wzr_log.txt", "w"); // plik do zapisu informacji testowych
 
 
-MovableObject *my_car;               // obiekt przypisany do tej aplikacji
+MovableObject* my_car;               // obiekt przypisany do tej aplikacji
 Environment env;
 
 map<int, MovableObject*> other_cars;
@@ -49,7 +54,7 @@ extern ViewParams viewpar;           // ustawienia widoku zdefiniowane w grafice
 long duration_of_day = 800;         // czas trwania dnia w [s]
 
 struct Frame                                      // g³ówna struktura s³u¿¹ca do przesy³ania informacji
-{	
+{
 	int iID;                                      // identyfikator obiektu, którego 
 	int type;                                     // typ ramki: informacja o stateie, informacja o zamkniêciu, komunikat tekstowy, ... 
 	ObjectState state;                            // po³o¿enie, prêdkoœæ: œrodka masy + k¹towe, ...
@@ -58,73 +63,77 @@ struct Frame                                      // g³ówna struktura s³u¿¹ca do
 	int iID_receiver;                             // nr ID odbiorcy wiadomoœci, jeœli skierowana jest tylko do niego
 };
 
+//++++
 // Funkcja w¹tku serwera
-DWORD WINAPI ServerThreadFun(void *ptr)
+DWORD WINAPI ServerThreadFun(void* ptr)
 {
-    unicast_net *s_reciv = new unicast_net(1001);
-    unicast_net *s_send = new unicast_net(1002);
-    Frame frame;
-    unsigned long senderIP;
+	unicast_net* s_reciv = new unicast_net(1001);
+	unicast_net* s_send = new unicast_net(1002);
+	Frame frame;
+	unsigned long senderIP;
 
-    while (1)
-    {
-        int bytes = s_reciv->reciv((char*)&frame, &senderIP, sizeof(Frame));
-        if (bytes == sizeof(Frame))
-        {
-            clients[senderIP] = clock(); // rejestracja/aktualizacja klienta
+	while (1)
+	{
+		int bytes = s_reciv->reciv((char*)&frame, &senderIP, sizeof(Frame));
+		if (bytes == sizeof(Frame))
+		{
+			clients[senderIP] = clock(); // rejestracja/aktualizacja klienta
 
-            // Rozsy³anie do wszystkich aktywnych klientów
-            for (auto it = clients.begin(); it != clients.end(); )
-            {
-                if (clock() - it->second > 5 * CLOCKS_PER_SEC) // usun nieaktywne klientów po 5s
-                {
-                    printf("Usunieto nieaktywnego klienta: %lu\n", it->first);
-                    it = clients.erase(it);
-                }
-                else
-                {
-                    s_send->send((char*)&frame, it->first, sizeof(Frame)); // retransmisja do klienta
-                    ++it;
-                }
-            }
-        }
-    }
-    return 1;
+			// Rozsy³anie do wszystkich aktywnych klientów
+			for (auto it = clients.begin(); it != clients.end(); )
+			{
+				if (clock() - it->second > 5 * CLOCKS_PER_SEC) // usun nieaktywne klientów po 5s
+				{
+					printf("Usunieto nieaktywnego klienta: %lu\n", it->first);
+					it = clients.erase(it);
+				}
+				else
+				{
+					s_send->send((char*)&frame, it->first, sizeof(Frame)); // retransmisja do klienta
+					++it;
+				}
+			}
+		}
+	}
+	return 1;
 }
+//====
 
 //******************************************
 // Funkcja obs³ugi w¹tku odbioru komunikatów 
 // UWAGA!  Odbierane s¹ te¿ komunikaty z w³asnej aplikacji by porównaæ obraz ekstrapolowany do rzeczywistego.
-DWORD WINAPI ReceiveThreadFun(void *ptr)
+DWORD WINAPI ReceiveThreadFun(void* ptr)
 {
-	unicast_net *pmt_net = (unicast_net*)ptr;  // wskaŸnik do obiektu klasy unicast_net
+	//++++
+	unicast_net* pmt_net = (unicast_net*)ptr;  // wskaŸnik do obiektu klasy unicast_net
 	Frame frame;
-    unsigned long senderIP;
+	unsigned long senderIP;
 
 	while (1)
 	{
 		int frame_size = pmt_net->reciv((char*)&frame, &senderIP, sizeof(Frame));   // oczekiwanie na nadejœcie ramki 
 		ObjectState state = frame.state;
+		//====
 
-		//fprintf(f, "odebrano stan iID = %d, ID dla mojego obiektu = %d\n", frame.iID, my_car->iID);
+				//fprintf(f, "odebrano stan iID = %d, ID dla mojego obiektu = %d\n", frame.iID, my_car->iID);
 
-		// Lock the Critical section
+				// Lock the Critical section
 		EnterCriticalSection(&m_cs);               // wejœcie na œcie¿kê krytyczn¹ - by inne w¹tki (np. g³ówny) nie wspó³dzieli³ 
-	                                               // tablicy other_cars
-		if ((frame.iID != my_car->iID)&&(frame.iID >= 100))      // jeœli to nie mój w³asny obiekt ani obiekt specjalny
+		// tablicy other_cars
+		if ((frame.iID != my_car->iID) && (frame.iID >= 100))      // jeœli to nie mój w³asny obiekt ani obiekt specjalny
 		{
-			
+
 			if ((other_cars.size() == 0) || (other_cars[frame.iID] == NULL))        // nie ma jeszcze takiego obiektu w tablicy -> trzeba go
 				// stworzyæ
 			{
-				MovableObject *ob = new MovableObject();
+				MovableObject* ob = new MovableObject();
 				ob->iID = frame.iID;
-				other_cars[frame.iID] = ob;		
+				other_cars[frame.iID] = ob;
 				//fprintf(f, "zarejestrowano %d obcy obiekt o ID = %d\n", iLiczbaCudzychOb - 1, CudzeObiekty[iLiczbaCudzychOb]->iID);
 			}
 			other_cars[frame.iID]->ChangeState(state);   // aktualizacja stateu obiektu obcego 	
-			
-		}	
+
+		}
 		//Release the Critical section
 		LeaveCriticalSection(&m_cs);               // wyjœcie ze œcie¿ki krytycznej
 	}  // while(1)
@@ -138,17 +147,20 @@ void InteractionInitialisation()
 {
 	DWORD dwThreadId;
 
-    is_server = (MessageBox(NULL, "Czy ta aplikacja to serwer?", "Wybór roli", MB_YESNO) == IDYES);
+	//++++
+	is_server = (MessageBox(NULL, "Czy ta aplikacja to serwer?", "Wybór roli", MB_YESNO) == IDYES);
 
-    if (is_server) {
-        CreateThread(NULL, 0, ServerThreadFun, NULL, 0, &dwThreadId);
-    }
+	if (is_server) {
+		CreateThread(NULL, 0, ServerThreadFun, NULL, 0, &dwThreadId);
+	}
+	//====
 
 	my_car = new MovableObject();    // tworzenie wlasnego obiektu
 
 	time_of_cycle = clock();             // pomiar aktualnego czasu
 
-	// obiekty sieciowe typu unicast
+	//++++
+		// obiekty sieciowe typu unicast
 	uni_reciv = new unicast_net(1002);      // klient odbiera na 1002
 	uni_send = new unicast_net(1001);       // klient wysy³a do serwera (port 1001)
 
@@ -157,9 +169,10 @@ void InteractionInitialisation()
 		NULL,                        // no security attributes
 		0,                           // use default stack size
 		ReceiveThreadFun,                // thread function
-		(void *)uni_reciv,               // argument to thread function
+		(void*)uni_reciv,               // argument to thread function
 		NULL,                        // use default creation flags
 		&dwThreadId);                // returns the thread identifier
+	//====
 	SetThreadPriority(threadReciv, THREAD_PRIORITY_HIGHEST);
 
 	printf("start interakcji\n");
@@ -192,7 +205,9 @@ void VirtualWorldCycle()
 	frame.state = my_car->State();               // state w³asnego obiektu 
 	frame.iID = my_car->iID;
 
+	//++++
 	uni_send->send((char*)&frame, (char*)SERVER_IP, sizeof(Frame));  // wys³anie komunikatu do serwera
+	//====
 }
 
 // *****************************************************************
@@ -217,7 +232,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	LPSTR     lpCmdLine,
 	int       nCmdShow)
 {
-	
+
 	//Initilze the critical section
 	InitializeCriticalSection(&m_cs);
 
@@ -227,7 +242,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	static char class_name[] = "Klasa_Podstawowa";
 
 	//Definiujemy klase g³ównego okna aplikacji
-	//Okreslamy tu wlasciwosci okna, szczegoly wygladu oraz
+	//Okreslamy tu wlasciwosci okna, szczegó³y wygl¹du oraz
 	//adres funkcji przetwarzajacej komunikaty
 	main_class.style = CS_HREDRAW | CS_VREDRAW;
 	main_class.lpfnWndProc = WndProc; //adres funkcji realizuj¹cej przetwarzanie meldunków 
@@ -246,7 +261,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	main_window = CreateWindow(class_name, "WZR-lab lato 2025/26 temat 1 - wersja a", WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
 		100, 50, 950, 650, NULL, NULL, hInstance, NULL);
 
-	
+
 
 	ShowWindow(main_window, nCmdShow);
 
@@ -340,13 +355,13 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		//LPDWORD lpExitCode;
 		DWORD ExitCode;
 		GetExitCodeThread(threadReciv, &ExitCode);
-		TerminateThread(threadReciv,ExitCode);
+		TerminateThread(threadReciv, ExitCode);
 		//ExitThread(ExitCode);
 
 		//Sleep(1000);
 
 		other_cars.clear();
-		
+
 
 		PostQuitMessage(0);
 		return 0;
@@ -398,7 +413,7 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 			float wheel_angle = (float)(mouse_cursor_x - x) / 20;
 			if (wheel_angle > 60) wheel_angle = 60;
 			if (wheel_angle < -60) wheel_angle = -60;
-			my_car->state.steering_angle = PI*wheel_angle / 180;
+			my_car->state.steering_angle = PI * wheel_angle / 180;
 			//my_car->steer_wheel_speed = (float)(mouse_cursor_x - x) / 20;
 		}
 		break;
@@ -430,11 +445,11 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		}
 		case VK_LEFT:
 		{
-			if (my_car->steer_wheel_speed < 0){
+			if (my_car->steer_wheel_speed < 0) {
 				my_car->steer_wheel_speed = 0;
 				my_car->if_keep_steer_wheel = true;
 			}
-			else{
+			else {
 				if (if_SHIFT_pressed) my_car->steer_wheel_speed = 0.5;
 				else my_car->steer_wheel_speed = 0.25 / 8;
 			}
@@ -443,11 +458,11 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		}
 		case VK_RIGHT:
 		{
-			if (my_car->steer_wheel_speed > 0){
+			if (my_car->steer_wheel_speed > 0) {
 				my_car->steer_wheel_speed = 0;
 				my_car->if_keep_steer_wheel = true;
 			}
-			else{
+			else {
 				if (if_SHIFT_pressed) my_car->steer_wheel_speed = -0.5;
 				else my_car->steer_wheel_speed = -0.25 / 8;
 			}
@@ -596,8 +611,8 @@ LRESULT CALLBACK WndProc(HWND main_window, UINT message_code, WPARAM wParam, LPA
 		{
 			my_car->Fb = 0.00;
 			//my_car->state.steering_angle = 0;
-			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = -0.25/8;
-			else my_car->steer_wheel_speed = 0; 
+			if (my_car->if_keep_steer_wheel) my_car->steer_wheel_speed = -0.25 / 8;
+			else my_car->steer_wheel_speed = 0;
 			my_car->if_keep_steer_wheel = false;
 			break;
 		}
