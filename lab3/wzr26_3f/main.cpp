@@ -228,30 +228,52 @@ void VirtualWorldCycle()
 
 		if (veh)
 		{
-			long t_prev = other_vehicles_last_update_clock[it->first];
-			long t_now = clock();
-			float dt_pred = (t_prev > 0 ? (float)(t_now - t_prev) / CLOCKS_PER_SEC : avg_cycle_time);
+			// U¿ywamy ma³ych i stabilnych kroków ca³kowania
+			float dt_pred = avg_cycle_time;
 			if (dt_pred < 0) dt_pred = 0;
-			if (dt_pred > 0.25f) dt_pred = 0.25f;
+			if (dt_pred > 0.1f) dt_pred = 0.1f;
+
+			// Utrzymujemy wektory kierunkowe pojazdu
+			Vector3 dir_right = veh->state.qOrient.rotate_vector(Vector3(0, 0, 1));
+			
+			// Pojazd ko³owy nie przemieszcza siê w bok (zjawisko crabbingu). 
+			// Usuwamy boczn¹ sk³adow¹ prêdkoœci i przyspieszenia (gdzie tkwi³a si³a doœrodkowa).
+			Vector3 vlat = dir_right * (veh->state.vV ^ dir_right);
+			Vector3 alat = dir_right * (veh->state.vA ^ dir_right);
+			veh->state.vV = veh->state.vV - vlat;
+			veh->state.vA = veh->state.vA - alat;
+
+			// T³umienie prêdkoœci k¹towych i wzd³u¿nych (by nie odjecha³ w kosmos)
+			veh->state.vV_ang = veh->state.vV_ang * exp(-dt_pred * 2.5f);
 
 			veh->state.vPos = veh->state.vPos + veh->state.vV*dt_pred + veh->state.vA*(0.5f*dt_pred*dt_pred);
 			veh->state.vV = veh->state.vV + veh->state.vA*dt_pred;
 
-			Vector3 d_angle = veh->state.vV_ang*dt_pred + veh->state.vA_ang*(0.5f*dt_pred*dt_pred);
+			Vector3 d_angle = veh->state.vV_ang*dt_pred;
 			float angle = d_angle.length();
 			if (angle > 1e-6f)
 			{
 				quaternion q_step = AsixToQuat(d_angle / angle, angle);
 				veh->state.qOrient = (q_step*veh->state.qOrient).n();
+
+				// Kluczowe: wektory prêdkoœci i przyspieszenia pod¹¿aj¹ w kierunku zorientowania obiektu!
+				veh->state.vV = q_step.rotate_vector(veh->state.vV);
+				veh->state.vA = q_step.rotate_vector(veh->state.vA);
 			}
-			veh->state.vV_ang = veh->state.vV_ang + veh->state.vA_ang*dt_pred;
 
 			if (veh->state.vPos.x < -terrain.field_size*terrain.number_of_columns / 2) veh->state.vPos.x += terrain.field_size*terrain.number_of_columns;
 			else if (veh->state.vPos.x > terrain.field_size*(terrain.number_of_columns - terrain.number_of_columns / 2)) veh->state.vPos.x -= terrain.field_size*terrain.number_of_columns;
 			if (veh->state.vPos.z < -terrain.field_size*terrain.number_of_rows / 2) veh->state.vPos.z += terrain.field_size*terrain.number_of_rows;
 			else if (veh->state.vPos.z > terrain.field_size*(terrain.number_of_rows - terrain.number_of_rows / 2)) veh->state.vPos.z -= terrain.field_size*terrain.number_of_rows;
 
-			other_vehicles_last_update_clock[it->first] = t_now;
+			// Zapobieganie wpadaniu widma pod mapê:
+			float y_ground = terrain.DistFromGround(veh->state.vPos.x, veh->state.vPos.z) + veh->height / 2 + veh->clearance;
+			if (veh->state.vPos.y < y_ground)
+			{
+				veh->state.vPos.y = y_ground;
+				if (veh->state.vV.y < 0) veh->state.vV.y = 0;
+				if (veh->state.vA.y < 0) veh->state.vA.y = 0;
+			}
 		}
 
 	}
@@ -282,7 +304,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	int       nCmdShow)
 {
 	
-	//Initilize the critical section
+	//Initilze the critical section
 	InitializeCriticalSection(&m_cs);
 
 	MSG message;		  //innymi slowy "komunikat"
@@ -291,7 +313,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	static char class_name[] = "Main_class";
 
 	//Definiujemy klase g³ównego okna aplikacji
-	//Okreslamy tu wlasciwosci okna, szczegoly wygladu oraz
+	//Okreslamy tu wlasciwosci okna, szczegó³y wygladu oraz
 	//adres funkcji przetwarzajacej komunikaty
 	main_class.style = CS_HREDRAW | CS_VREDRAW;
 	main_class.lpfnWndProc = WndProc; //adres funkcji realizuj¹cej przetwarzanie meldunków 
