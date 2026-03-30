@@ -1,0 +1,5 @@
+height_map terrain: number_of_rows = 38, number_of_columns = 43
+my_vehicle->iID = 574
+poczatek interakcji
+my_vehicle->iID = 41
+Koniec interakcji
