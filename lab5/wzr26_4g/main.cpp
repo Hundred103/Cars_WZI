@@ -106,7 +106,7 @@ int auction_initiator_id = -1;
 int auction_highest_bidder_id = -1;
 int auction_current_bid = 0; // Najnizsza oferowana cena za paliwo
 long auction_end_time = 0;
-float auction_price = 0.0f; // Ilosc paliwa oferowana przez inicjatora
+float auction_price = 0.0f; // Ilosc paliwa, ktora inicjator chce kupic
 const long AUCTION_DURATION_MS = 20000;
 int typed_auction_bid = 0;
 bool typing_auction_bid = false;
@@ -521,7 +521,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			auction_highest_bidder_id = -1;
 			auction_end_time = clock() + AUCTION_DURATION_MS;
 			typing_auction_bid = false;
-			sprintf(par_view.inscription2, "Licytujemy._Inicjator_daje_%0.1f_l_paliwa._Cena_startowa:_%d", auction_price, auction_current_bid);
+			sprintf(par_view.inscription2, "Licytujemy._Inicjator_kupuje_%0.1f_l_paliwa._Cena_startowa:_%d", auction_price, auction_current_bid);
 			break;
 		}
 		case AUCTION_BID:
@@ -626,8 +626,8 @@ void VirtualWorldCycle()
 				multi_send->send((char*)&frame, sizeof(Frame));
 
 				if (auction_highest_bidder_id != -1) {
-					sprintf(par_view.inscription2, "Koniec_licytacji!_Zwyciezca:_ID_%d_otrzymuje_paliwo", auction_highest_bidder_id);
-					// Przekazanie paliwa do zwyciezcy
+					sprintf(par_view.inscription2, "Koniec_licytacji!_Zwyciezca:_ID_%d_otrzymuje_paliwo_i_odsyla_gotowke", auction_highest_bidder_id);
+					// Przekazanie paliwa do zwyciezcy, a potem pobranie gotowki
 					TransferSending(auction_highest_bidder_id, FUEL, auction_price);
 				} else {
 					sprintf(par_view.inscription2, "Koniec_licytacji!_Brak_ofert.");
