@@ -540,8 +540,8 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 		{
 			auction_active = false;
 			if (auction_highest_bidder_id == my_vehicle->iID) {
-				sprintf(par_view.inscription2, "Wygrales_licytacje!_Wysylasz_%d_gotowki", auction_current_bid);
-				TransferSending(auction_initiator_id, MONEY, (float)auction_current_bid);
+				sprintf(par_view.inscription2, "Wygrales_licytacje!_Wysylasz_%d_l_paliwa", auction_price);
+				TransferSending(auction_initiator_id, FUEL, auction_price);
 			} else {
 				sprintf(par_view.inscription2, "Licytacja_zakonczona.");
 			}
@@ -626,9 +626,9 @@ void VirtualWorldCycle()
 				multi_send->send((char*)&frame, sizeof(Frame));
 
 				if (auction_highest_bidder_id != -1) {
-					sprintf(par_view.inscription2, "Koniec_licytacji!_Zwyciezca:_ID_%d_otrzymuje_paliwo_i_odsyla_gotowke", auction_highest_bidder_id);
-					// Przekazanie paliwa do zwyciezcy, a potem pobranie gotowki
-					TransferSending(auction_highest_bidder_id, FUEL, auction_price);
+					sprintf(par_view.inscription2, "Koniec_licytacji!_Zwyciezca:_ID_%d_wysyla_paliwo_i_otrzymuje_gotowke", auction_highest_bidder_id);
+					// Przekazanie gotowki do zwyciezcy za dostarczone paliwo
+					TransferSending(auction_highest_bidder_id, MONEY, auction_current_bid);
 				} else {
 					sprintf(par_view.inscription2, "Koniec_licytacji!_Brak_ofert.");
 				}
