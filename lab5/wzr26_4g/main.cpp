@@ -615,8 +615,8 @@ void VirtualWorldCycle()
 	if (auction_active) {
 		long remaining_time = auction_end_time - clock();
 		if (remaining_time > 0) {
-			sprintf(par_view.inscription1, "LICYTACJA:_Inicjator_ID_%d_Naj_ofi_ID_%d_Cena_%d_Czas_%0.1f_s", 
-				auction_initiator_id, auction_highest_bidder_id, auction_current_bid, remaining_time / 1000.0f);
+			sprintf(par_view.inscription1, "LICYTACJA:_Inicjator_ID_%d_Paliwo_%0.1f_Naj_ofi_ID_%d_Cena_%d_Czas_%0.1f_s", 
+				auction_initiator_id, auction_price, auction_highest_bidder_id, auction_current_bid, remaining_time / 1000.0f);
 		} else {
 			if (auction_initiator_id == my_vehicle->iID) {
 				Frame frame;

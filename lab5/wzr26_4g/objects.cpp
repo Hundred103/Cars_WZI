@@ -62,7 +62,7 @@ MovableObject::MovableObject(Terrain *t)             // konstruktor
 	state.if_autonomous = 0;
 
 	state.money = 1000;    // np. dolarów
-	state.amount_of_fuel = 10.0;   // np. kilogramów paliwa 
+	state.amount_of_fuel = 1000.0;   // np. kilogramów paliwa 
 
 	time_of_simulation = 0;    // symulowany czas rzeczywisty od pocz¹tku istnienia obiektu 
 
