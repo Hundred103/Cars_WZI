@@ -1183,7 +1183,24 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 		}
 		case VK_BACK:
 		{
-			if (typed_offer_editing)
+			if (setup_auction_step > 0)
+			{
+				if (setup_auction_step == 1)
+					setup_auction_price /= 10;
+				else if (setup_auction_step == 2)
+					setup_auction_min_fuel /= 10;
+
+				if (setup_auction_step == 1)
+					sprintf(par_view.inscription2, "Ustal_cene_startowa_(Enter=dalej):_%d", setup_auction_price);
+				else
+					sprintf(par_view.inscription2, "Ustal_ilosc_paliwa_(Enter=start):_%d", setup_auction_min_fuel);
+			}
+			else if (auction_active && typing_auction_bid)
+			{
+				typed_auction_bid /= 10;
+				sprintf(par_view.inscription2, "Wpisana_oferta_ceny:_%d", typed_auction_bid);
+			}
+			else if (typed_offer_editing)
 			{
 				typed_offer_percent /= 10;
 				if (typed_offer_percent < 0) typed_offer_percent = 0;
