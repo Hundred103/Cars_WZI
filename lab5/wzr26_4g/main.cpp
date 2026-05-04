@@ -1219,25 +1219,35 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 			} else if (setup_auction_step == 2) {
 				setup_auction_step = 0;
 				if (!auction_active) {
-					Frame frame;
-					ZeroMemory(&frame, sizeof(Frame));
-					frame.frame_type = AUCTION_START;
-					frame.iID = my_vehicle->iID;
-					frame.auction_bid = setup_auction_min_fuel; 
-					frame.transfer_value = (float)setup_auction_price; 
-					multi_send->send((char*)&frame, sizeof(Frame));
+					// Lister must have enough money to cover the starting price
+					if (my_vehicle->state.money < setup_auction_price) {
+						sprintf(par_view.inscription2, "Brak_srodkow_na_wystawienie_licytacji:_%d_vs_%d", setup_auction_price, my_vehicle->state.money);
+					} else {
+						Frame frame;
+						ZeroMemory(&frame, sizeof(Frame));
+						frame.frame_type = AUCTION_START;
+						frame.iID = my_vehicle->iID;
+						frame.auction_bid = setup_auction_min_fuel; 
+						frame.transfer_value = (float)setup_auction_price; 
+						multi_send->send((char*)&frame, sizeof(Frame));
+					}
 				}
 				break;
 			}
 
 			if (auction_active && typing_auction_bid) {
 				if (my_vehicle->iID != auction_initiator_id) {
+					// Bidders must have at least as much fuel as the auction requires
+					if (my_vehicle->state.amount_of_fuel < auction_price) {
+						sprintf(par_view.inscription2, "Brak_paliwa_do_wykonania_transakcji._Posiadasz:%0.1f_wymagane:%0.1f", my_vehicle->state.amount_of_fuel, auction_price);
+					} else {
 					Frame frame;
 					ZeroMemory(&frame, sizeof(Frame));
 					frame.frame_type = AUCTION_BID;
 					frame.iID = my_vehicle->iID;
 					frame.auction_bid = typed_auction_bid;
 					multi_send->send((char*)&frame, sizeof(Frame));
+					}
 				} else {
 					sprintf(par_view.inscription2, "Nie_mozesz_oferowac_we_wlasnej_licytacji!");
 				}
