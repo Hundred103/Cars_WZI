@@ -282,10 +282,6 @@ void VirtualWorldCycle()
 		frame.iID = my_vehicle->iID;
 		int iRozmiar = multi_send->send((char*)&frame, sizeof(Frame));
 
-		char text[128];
-		//sprintf(par_view.inscription2, "Zderzenie_z_obiektem_o_ID = %d", my_vehicle->iID_collider);
-		//SetWindowText(main_window,text);
-
 		my_vehicle->iID_collider = -1;
 	}
 
