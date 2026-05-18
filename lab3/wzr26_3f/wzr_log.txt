@@ -45,3 +45,8 @@ poczatek interakcji
 my_vehicle->iID = 41
 Po czasie 25.00[s]  œr.czêstoœæ = 1.00[r/s]  œr.odl = 7.556[m]  œr.ró¿n.k¹t. = 3.251[st]
 End of interaction
+height_map terrain: number_of_rows = 38, number_of_columns = 43
+my_vehicle->iID = 93
+poczatek interakcji
+my_vehicle->iID = 41
+End of interaction
