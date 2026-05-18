@@ -11,6 +11,7 @@ extern map<int, MovableObject*> network_vehicles;
 extern float TransferSending(int ID_receiver, int transfer_type, float transfer_value);
 extern MovableObject *my_vehicle;
 extern FILE *f;
+extern ViewParameters par_view;
 
 struct AgentPartnership {
     bool is_paired = false;
@@ -64,12 +65,14 @@ void AutoPilot::AutoControl(MovableObject *ob)
 			seeking_fuel = true;
 			fprintf(f, "[FUEL] Agent %d entering fuel-seeking mode (fuel=%.2f).\n",
 				ob->iID, ob->state.amount_of_fuel);
+			sprintf(par_view.inscription2, "FUEL LOW - Agent %d seeking fuel (%.2f)", ob->iID, ob->state.amount_of_fuel);
 		}
 	} else if (seeking_fuel && ob->state.amount_of_fuel >= FUEL_SEEK_EXIT) {
 		// Latch off: fuel is sufficiently restored.
 		seeking_fuel = false;
 		fprintf(f, "[FUEL] Agent %d leaving fuel-seeking mode (fuel=%.2f).\n",
 			ob->iID, ob->state.amount_of_fuel);
+		sprintf(par_view.inscription2, "FUEL OK - Agent %d back to coins (%.2f)", ob->iID, ob->state.amount_of_fuel);
 	}
 
 	// While seeking fuel, collect barrels exclusively; otherwise collect coins exclusively.
@@ -149,6 +152,10 @@ void AutoPilot::AutoControl(MovableObject *ob)
 
 					fprintf(f, "[NEGOTIATION] Agent %d paired with Agent %d. Split: Agent %d gets %.0f%%, Agent %d gets %.0f%%.\n", 
 							ob->iID, other->iID, ob->iID, my_partnership.my_money_share * 100, other->iID, other_partnership.my_money_share * 100);
+					sprintf(par_view.inscription2, "PAIRED: Agent %d + Agent %d  |  %d:%.0f%%  %d:%.0f%%",
+							ob->iID, other->iID,
+							ob->iID, my_partnership.my_money_share * 100,
+							other->iID, other_partnership.my_money_share * 100);
 					break;
 				}
 			}
@@ -171,6 +178,8 @@ void AutoPilot::AutoControl(MovableObject *ob)
 				TransferSending(my_partnership.partner_id, 0 /*MONEY*/, amount_to_send);
 				fprintf(f, "[TRANSFER] Agent %d collected %ld money. Sending partner (Agent %d) their %.0f%% cut: %.2f.\n", 
 					ob->iID, earned_money, my_partnership.partner_id, partner_share_percent * 100, amount_to_send);
+				sprintf(par_view.inscription2, "TRANSFER: Agent %d -> Agent %d  |  %.2f (%.0f%% cut)",
+					ob->iID, my_partnership.partner_id, amount_to_send, partner_share_percent * 100);
 			}
 		}
 		
