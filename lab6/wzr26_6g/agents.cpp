@@ -12,6 +12,14 @@ extern float TransferSending(int ID_receiver, int transfer_type, float transfer_
 extern MovableObject *my_vehicle;
 extern FILE *f;
 
+struct AgentPartnership {
+    bool is_paired = false;
+    int partner_id = -1;
+    float my_money_share = 1.0f; // 1.0 = 100%
+    long last_negotiation_time = 0;
+};
+
+static std::map<int, AgentPartnership> agent_partnerships;
 
 AutoPilot::AutoPilot()
 {
@@ -126,107 +134,57 @@ void AutoPilot::AutoControl(MovableObject *ob)
 
 	// remember last observed money/fuel for this local vehicle so we can split recent earnings
 	static long last_money_snapshot = -1;
-	static float last_fuel_snapshot = -1.0f;
 
-	// cooperation radius (meters) to consider partners who helped collect an item
-	const float COOP_RADIUS = 50.0f;
+	AgentPartnership& my_partnership = agent_partnerships[ob->iID];
 
-	if (last_money_snapshot == -1) last_money_snapshot = ob->state.money;
-	if (last_fuel_snapshot < 0) last_fuel_snapshot = ob->state.amount_of_fuel;
-	if (clock() - last_transfer_time > 1000 && ob == my_vehicle) {
-		last_transfer_time = clock();
-		// legacy pairwise balancing (keeps totals balanced between pairs)
+	if (!my_partnership.is_paired) {
+		// Look for an unpaired partner
 		for (auto it = network_vehicles.begin(); it != network_vehicles.end(); ++it) {
 			MovableObject *other = it->second;
 			if (other && other->iID != ob->iID) {
-				float total_money = ob->state.money + other->state.money;
-				float my_target_money = total_money * (ob->money_collection_skills / (ob->money_collection_skills + other->money_collection_skills));
-				if (ob->state.money > my_target_money + 1.0f) {
-					TransferSending(other->iID, 0 /*MONEY*/, ob->state.money - my_target_money);
-				}
+				AgentPartnership& other_partnership = agent_partnerships[other->iID];
+				
+				if (!other_partnership.is_paired && clock() - my_partnership.last_negotiation_time > 2000) {
+					// Propose a split based on skills. 
+					float total_skills = ob->money_collection_skills + other->money_collection_skills;
+					float proposed_my_share = ob->money_collection_skills / (total_skills + 0.001f);
+					
+					my_partnership.is_paired = true;
+					my_partnership.partner_id = other->iID;
+					my_partnership.my_money_share = proposed_my_share;
+					
+					other_partnership.is_paired = true;
+					other_partnership.partner_id = ob->iID;
+					other_partnership.my_money_share = 1.0f - proposed_my_share;
 
-				float total_fuel = ob->state.amount_of_fuel + other->state.amount_of_fuel;
-				float my_target_fuel = total_fuel * (ob->fuel_collection_skills / (ob->fuel_collection_skills + other->fuel_collection_skills));
-				if (ob->state.amount_of_fuel > my_target_fuel + 0.1f) {
-					TransferSending(other->iID, 1 /*FUEL*/, ob->state.amount_of_fuel - my_target_fuel);
+					fprintf(f, "[NEGOTIATION] Agent %d paired with Agent %d. Split: Agent %d gets %.0f%%, Agent %d gets %.0f%%.\n", 
+							ob->iID, other->iID, ob->iID, my_partnership.my_money_share * 100, other->iID, other_partnership.my_money_share * 100);
+					break;
 				}
 			}
 		}
+		my_partnership.last_negotiation_time = clock();
+	}
 
-		// ----- New: split recent earnings among nearby cooperating cars proportionally to their skills -----
+	if (last_money_snapshot == -1) last_money_snapshot = ob->state.money;
+	
+	if (clock() - last_transfer_time > 1000 && ob == my_vehicle) {
+		last_transfer_time = clock();
+		
 		long earned_money = ob->state.money - last_money_snapshot;
-		float earned_fuel = ob->state.amount_of_fuel - last_fuel_snapshot;
 
-		if (earned_money > 0) {
-			// find nearby partners (including those in network_vehicles within COOP_RADIUS)
-			float sum_skills = ob->money_collection_skills;
-			vector<MovableObject*> partners;
-			partners.push_back(ob);
-			for (auto it2 = network_vehicles.begin(); it2 != network_vehicles.end(); ++it2) {
-				MovableObject *other = it2->second;
-				if (!other || other->iID == ob->iID) continue;
-				float d = (other->state.vPos - ob->state.vPos).length();
-				if (d <= COOP_RADIUS) {
-					partners.push_back(other);
-					sum_skills += other->money_collection_skills;
-				}
+		if (earned_money > 0 && my_partnership.is_paired) {
+			float partner_share_percent = 1.0f - my_partnership.my_money_share;
+			float amount_to_send = earned_money * partner_share_percent;
+			
+			if (amount_to_send > 0) {
+				TransferSending(my_partnership.partner_id, 0 /*MONEY*/, amount_to_send);
+				fprintf(f, "[TRANSFER] Agent %d collected %ld money. Sending partner (Agent %d) their %.0f%% cut: %.2f.\n", 
+					ob->iID, earned_money, my_partnership.partner_id, partner_share_percent * 100, amount_to_send);
 			}
-
-			if (partners.size() > 1 && sum_skills > 0.0f) {
-				fprintf(f, "Splitting recent earning %.2f among %zu partners (skill sum=%.3f)\n", (double)earned_money, partners.size(), (double)sum_skills);
-				// send each partner their proportional share (except self)
-				float total_sent = 0.0f;
-				for (size_t p = 0; p < partners.size(); ++p) {
-					MovableObject *m = partners[p];
-					if (m->iID == ob->iID) continue; // local keeps its portion until we send others
-					float share = earned_money * (m->money_collection_skills / sum_skills);
-					if (share <= 0) continue;
-					TransferSending(m->iID, 0 /*MONEY*/, share);
-					total_sent += share;
-					fprintf(f, "  -> to ID %d share=%.2f (skill=%.3f)\n", m->iID, (double)share, (double)m->money_collection_skills);
-				}
-				// adjust last snapshot: after sending money has been deducted by TransferSending
-				last_money_snapshot = ob->state.money;
-			} else {
-				// no partners -> just update snapshot
-				last_money_snapshot = ob->state.money;
-			}
-		} else {
-			// if money decreased or unchanged, update snapshot to current (prevents re-trigger)
-			last_money_snapshot = ob->state.money;
 		}
-
-		if (earned_fuel > 0.001f) {
-			float sum_skills_f = ob->fuel_collection_skills;
-			vector<MovableObject*> partners_f;
-			partners_f.push_back(ob);
-			for (auto it2 = network_vehicles.begin(); it2 != network_vehicles.end(); ++it2) {
-				MovableObject *other = it2->second;
-				if (!other || other->iID == ob->iID) continue;
-				float d = (other->state.vPos - ob->state.vPos).length();
-				if (d <= COOP_RADIUS) {
-					partners_f.push_back(other);
-					sum_skills_f += other->fuel_collection_skills;
-				}
-			}
-
-			if (partners_f.size() > 1 && sum_skills_f > 0.0f) {
-				fprintf(f, "Splitting recent fuel gain %.2f among %zu partners (skill sum=%.3f)\n", (double)earned_fuel, partners_f.size(), (double)sum_skills_f);
-				for (size_t p = 0; p < partners_f.size(); ++p) {
-					MovableObject *m = partners_f[p];
-					if (m->iID == ob->iID) continue;
-					float share = earned_fuel * (m->fuel_collection_skills / sum_skills_f);
-					if (share <= 0) continue;
-					TransferSending(m->iID, 1 /*FUEL*/, share);
-					fprintf(f, "  -> to ID %d fuel_share=%.2f (skill=%.3f)\n", m->iID, (double)share, (double)m->fuel_collection_skills);
-				}
-				last_fuel_snapshot = ob->state.amount_of_fuel;
-			} else {
-				last_fuel_snapshot = ob->state.amount_of_fuel;
-			}
-		} else {
-			last_fuel_snapshot = ob->state.amount_of_fuel;
-		}
+		
+		last_money_snapshot = ob->state.money;
 	}
 
 
