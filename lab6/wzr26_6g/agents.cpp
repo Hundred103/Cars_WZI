@@ -50,17 +50,31 @@ void AutoPilot::AutoControl(MovableObject *ob)
 	float min_dist = 1e10;
 	int target_idx = -1;
 
-	// determine fuel thresholds using tank_capacity when available
-	float low_fuel_threshold = 2.0f;
-	float high_fuel_threshold = 50.0f;
-	if (ob->tank_capacity > 0) {
-		low_fuel_threshold = ob->tank_capacity * 0.2f;
-		high_fuel_threshold = ob->tank_capacity * 0.8f;
+	// Fixed fuel thresholds: enter fuel-seeking mode below 3.0, exit only after reaching 15.0.
+	static const float FUEL_SEEK_ENTER = 3.0f;
+	static const float FUEL_SEEK_EXIT  = 15.0f;
+
+	// Per-vehicle sticky fuel-seeking flag.
+	static std::map<int, bool> seeking_fuel_map;
+	bool& seeking_fuel = seeking_fuel_map[ob->iID];
+
+	if (ob->state.amount_of_fuel <= FUEL_SEEK_ENTER) {
+		// Latch on: fuel is critically low.
+		if (!seeking_fuel) {
+			seeking_fuel = true;
+			fprintf(f, "[FUEL] Agent %d entering fuel-seeking mode (fuel=%.2f).\n",
+				ob->iID, ob->state.amount_of_fuel);
+		}
+	} else if (seeking_fuel && ob->state.amount_of_fuel >= FUEL_SEEK_EXIT) {
+		// Latch off: fuel is sufficiently restored.
+		seeking_fuel = false;
+		fprintf(f, "[FUEL] Agent %d leaving fuel-seeking mode (fuel=%.2f).\n",
+			ob->iID, ob->state.amount_of_fuel);
 	}
 
-	// If fuel is low, prefer barrels only. If fuel is very high, prefer coins only.
-	bool force_barrels = (ob->state.amount_of_fuel <= low_fuel_threshold);
-	bool force_coins = (ob->state.amount_of_fuel >= high_fuel_threshold);
+	// While seeking fuel, collect barrels exclusively; otherwise collect coins exclusively.
+	bool force_barrels = seeking_fuel;
+	bool force_coins   = !seeking_fuel;
 
 	for (long i = 0; i < teren->number_of_items; i++) {
 		if (!przedmioty[i].to_take) continue;
