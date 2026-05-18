@@ -92,29 +92,6 @@ void AutoPilot::AutoControl(MovableObject *ob)
 		float dot_right = diff ^ vect_local_right;
 		float dot_fwd = diff ^ vect_local_forward;
 
-		// If there's a tree roughly between us and the target, attempt a detour by turning
-		float dist_to_target = diff.length();
-		bool blocked_by_tree = false;
-		for (long ti = 0; ti < teren->number_of_items; ti++) {
-			if (przedmioty[ti].type != ITEM_TREE) continue;
-			Vector3 treeDiff = przedmioty[ti].vPos - ob->state.vPos;
-			float dTree = treeDiff.length();
-			if (dTree <= 0.01f || dTree >= dist_to_target) continue;
-			// angle between forward and tree
-			float angle_tree = atan2((treeDiff ^ vect_local_right), (treeDiff ^ vect_local_forward));
-			float angle_target = atan2((diff ^ vect_local_right), (diff ^ vect_local_forward));
-			// if tree is roughly in front (within ~22 degrees) and near the line to target, consider it blocking
-			if (fabs(angle_tree) < (22.0f * PI / 180.0f) && fabs(angle_tree - angle_target) < (30.0f * PI / 180.0f)) {
-				blocked_by_tree = true;
-				// steer around: pick direction away from tree lateral position
-				float turn_dir = (treeDiff ^ vect_local_right) > 0 ? -1.0f : 1.0f; // if tree on right, turn left
-				ob->state.wheel_turn_angle = turn_dir * ob->alpha_max * 0.8f;
-				ob->F = ob->F_max * 0.5f; // slow while turning
-				break;
-			}
-		}
-		if (!blocked_by_tree) {
-
 		float kat = atan2(dot_right, dot_fwd);
 		ob->state.wheel_turn_angle = -kat;
 		if (ob->state.wheel_turn_angle > ob->alpha_max) ob->state.wheel_turn_angle = ob->alpha_max;
@@ -124,7 +101,6 @@ void AutoPilot::AutoControl(MovableObject *ob)
 		else ob->F = ob->F_max;
 
 		if (ob->state.vV.length() > 20) ob->F = 0;
-		}
 	} else {
 		ob->F = 0;
 		ob->breaking_degree = 1;
