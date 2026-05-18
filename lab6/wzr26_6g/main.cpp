@@ -338,7 +338,7 @@ void VirtualWorldCycle()
 	if (if_autonomous_control)
 	{
 		ap->AutoControl(my_vehicle);
-		sprintf(par_view.inscription2, "F=%f,_ham=%f,_alfa=%f", my_vehicle->F, my_vehicle->breaking_degree, my_vehicle->state.wheel_turn_angle);
+		//sprintf(par_view.inscription2, "F=%f,_ham=%f,_alfa=%f", my_vehicle->F, my_vehicle->breaking_degree, my_vehicle->state.wheel_turn_angle);
 	}
 
 
