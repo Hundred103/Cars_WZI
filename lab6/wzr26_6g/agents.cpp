@@ -2,10 +2,18 @@
 #include <time.h>
 #include <map>
 #include <vector>
-
+#include <windows.h>
+#include <math.h>
+#include <gl\gl.h>
+#include <gl\glu.h>
+#include <iterator> 
+#include <map>
 using namespace std;
 
+#include "objects.h"
 #include "agents.h"
+#include "graphics.h"
+#include "net.h"
 
 extern map<int, MovableObject*> network_vehicles;
 extern float TransferSending(int ID_receiver, int transfer_type, float transfer_value);
@@ -131,9 +139,9 @@ void AutoPilot::AutoControl(MovableObject *ob)
 	AgentPartnership& my_partnership = agent_partnerships[ob->iID];
 
 	// DEBUG: show how many network peers are visible
-	sprintf(par_view.inscription2, "Peers: %d | Paired: %s",
-		(int)network_vehicles.size(),
-		my_partnership.is_paired ? "YES" : "NO");
+	//sprintf(par_view.inscription2, "Peers: %d | Paired: %s",
+		//(int)network_vehicles.size(),
+		//my_partnership.is_paired ? "YES" : "NO");
 
 	if (!my_partnership.is_paired) {
 		// Look for an unpaired partner
