@@ -130,6 +130,11 @@ void AutoPilot::AutoControl(MovableObject *ob)
 
 	AgentPartnership& my_partnership = agent_partnerships[ob->iID];
 
+	// DEBUG: show how many network peers are visible
+	sprintf(par_view.inscription2, "Peers: %d | Paired: %s",
+		(int)network_vehicles.size(),
+		my_partnership.is_paired ? "YES" : "NO");
+
 	if (!my_partnership.is_paired) {
 		// Look for an unpaired partner
 		for (auto it = network_vehicles.begin(); it != network_vehicles.end(); ++it) {
