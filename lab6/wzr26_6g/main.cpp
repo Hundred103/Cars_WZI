@@ -20,7 +20,7 @@ using namespace std;
 #include "net.h"
 
 
-bool if_different_skills = false;          // czy zró¿nicowanie umiejêtnoœci (dla ka¿dego pojazdu losowane s¹ umiejêtnoœci
+bool if_different_skills = true;          // czy zróżnicowanie umiejętności (dla każdego pojazdu losowane są umiejętności
 // zbierania gotówki i paliwa)
 bool if_autonomous_control = false;       // sterowanie autonomiczne pojazdem
 
@@ -235,7 +235,7 @@ void VirtualWorldCycle()
 	// obliczenie œredniego czasu pomiêdzy dwoma kolejnnymi symulacjami po to, by zachowaæ  fizycznych 
 	if (counter_of_simulations % 50 == 0)          // jeœli licznik cykli przekroczy³ pewn¹ wartoœæ, to
 	{                                   // nale¿y na nowo obliczyæ œredni czas cyklu fDt
-		char text[200];
+		char text[1024];
 		long prev_time = VW_cycle_time;
 		VW_cycle_time = clock();
 		float fFps = (50 * CLOCKS_PER_SEC) / (float)(VW_cycle_time - prev_time);
@@ -243,6 +243,9 @@ void VirtualWorldCycle()
 
 		sprintf(par_view.inscription1, " %0.0f_fps, fuel = %0.2f, money = %d,", fFps, my_vehicle->state.amount_of_fuel, my_vehicle->state.money);
 		if (counter_of_simulations % 500 == 0) sprintf(par_view.inscription2, "");
+
+		sprintf(text, "WZR 2025/26, temat 6, wersja g [Y-autopilot, F11-autop.test] | Moje ID: %d [F:%.2f M:%.2f]", my_vehicle->iID, my_vehicle->fuel_collection_skills, my_vehicle->money_collection_skills);
+		SetWindowText(main_window, text);
 	}
 
 	if (autopilot_presentation_mode)

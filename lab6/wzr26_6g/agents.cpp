@@ -1,7 +1,14 @@
 #include <stdlib.h>
 #include <time.h>
+#include <map>
+
+using namespace std;
 
 #include "agents.h"
+
+extern map<int, MovableObject*> network_vehicles;
+extern float TransferSending(int ID_receiver, int transfer_type, float transfer_value);
+extern MovableObject *my_vehicle;
 
 
 AutoPilot::AutoPilot()
@@ -28,11 +35,66 @@ void AutoPilot::AutoControl(MovableObject *ob)
 
 
 	// TUTAJ NALE¯Y UMIEŒCIÆ ALGORYTM AUTONOMICZNEGO STEROWANIA POJAZDEM
-	// .................................................................
-	// .................................................................
-	// .................................................................
-	// .................................................................
-	// .................................................................
+
+	float min_dist = 1e10;
+	int target_idx = -1;
+	for (long i = 0; i < teren->number_of_items; i++) {
+		if (przedmioty[i].to_take) {
+			if (przedmioty[i].type == ITEM_COIN || przedmioty[i].type == ITEM_BARREL) {
+				Vector3 diff = przedmioty[i].vPos - ob->state.vPos;
+				float dist = diff.length();
+				float weight = 1.0;
+				if (przedmioty[i].type == ITEM_COIN) weight /= (ob->money_collection_skills + 0.01);
+				if (przedmioty[i].type == ITEM_BARREL) weight /= (ob->fuel_collection_skills + 0.01);
+
+				float score = dist * weight;
+				if (score < min_dist) {
+					min_dist = score;
+					target_idx = i;
+				}
+			}
+		}
+	}
+
+	if (target_idx != -1) {
+		Vector3 diff = przedmioty[target_idx].vPos - ob->state.vPos;
+		float dot_right = diff ^ vect_local_right;     
+		float dot_fwd = diff ^ vect_local_forward;
+
+		float kat = atan2(dot_right, dot_fwd);
+		ob->state.wheel_turn_angle = -kat; 
+		if (ob->state.wheel_turn_angle > ob->alpha_max) ob->state.wheel_turn_angle = ob->alpha_max;
+		if (ob->state.wheel_turn_angle < -ob->alpha_max) ob->state.wheel_turn_angle = -ob->alpha_max;
+
+		if (dot_fwd < 0) ob->F = -ob->F_max/2;
+		else ob->F = ob->F_max;
+
+		if (ob->state.vV.length() > 20) ob->F = 0; 
+	} else {
+		ob->F = 0;
+		ob->breaking_degree = 1;
+	}
+
+	static long last_transfer_time = clock();
+	if (clock() - last_transfer_time > 1000 && ob == my_vehicle) {
+		last_transfer_time = clock();
+		for (auto it = network_vehicles.begin(); it != network_vehicles.end(); ++it) {
+			MovableObject *other = it->second;
+			if (other && other->iID != ob->iID) {
+				float total_money = ob->state.money + other->state.money;
+				float my_target_money = total_money * (ob->money_collection_skills / (ob->money_collection_skills + other->money_collection_skills));
+				if (ob->state.money > my_target_money + 1.0f) {
+					TransferSending(other->iID, 0 /*MONEY*/, ob->state.money - my_target_money);
+				}
+
+				float total_fuel = ob->state.amount_of_fuel + other->state.amount_of_fuel;
+				float my_target_fuel = total_fuel * (ob->fuel_collection_skills / (ob->fuel_collection_skills + other->fuel_collection_skills));
+				if (ob->state.amount_of_fuel > my_target_fuel + 0.1f) {
+					TransferSending(other->iID, 1 /*FUEL*/, ob->state.amount_of_fuel - my_target_fuel);
+				}
+			}
+		}
+	}
 
 
 }
