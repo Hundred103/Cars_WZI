@@ -1,0 +1,23 @@
+
+Odczyt danych o terrainie z pliku stozki_5.map
+
+  size sektora = 480.000000
+  czas odnowy przedmiotu = 120.000000
+  if_toroidal_world = 0
+  border_x = -1.000000
+  border_z = -1.000000
+  liczba sekt. = 967
+  std poziom wody = -10000000000.000000
+Znaleziono w pliku stozki_5.map przedmioty w liczbie 1556
+Koniec wczytywania danych o terrainie.
+Nowy obiekt: iID = 648
+Nowy obiekt: iID = 141
+state.vPos = Vector3(-1548.731689, 11.199162 , -731.229980);
+state.qOrient = quaternion(0.000000,-0.999606,0.000000,-0.027826);
+Koniec interakcji
+Koniec wczytywania danych o terrainie.
+Nowy obiekt: iID = 589
+Nowy obiekt: iID = 141
+state.vPos = Vector3(-1570.134277, 10.966375 , -717.673401);
+state.qOrient = quaternion(0.000000,-0.874126,0.000000,0.485681);
+Koniec interakcji
