@@ -412,3 +412,7 @@ FodyWeavers.xsd
 *.msp
 
 .vscode
+
+*.bat
+*.class
+*.txt
