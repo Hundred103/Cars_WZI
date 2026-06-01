@@ -11,6 +11,10 @@ public class BookSellerAgent extends Agent
 {
   // Katalog książek na sprzedaż:
   private Hashtable catalogue;
+  private static final int PRICE_DECREMENT = 2;
+  private static final int MAX_DECREMENTS = 5;
+  private Map currentPrices = new HashMap();
+  private Map decrementCounts = new HashMap();
 
   // Inicjalizacja klasy agenta:
   protected void setup()
@@ -57,28 +61,61 @@ public class BookSellerAgent extends Agent
       public void action()
       {
         // Tworzenie szablonu wiadomości (wstępne określenie tego, co powinna zawierać wiadomość)
-        MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
+        MessageTemplate mt = MessageTemplate.or(
+          MessageTemplate.MatchPerformative(ACLMessage.CFP),
+          MessageTemplate.MatchPerformative(ACLMessage.PROPOSE));
         // Próba odbioru wiadomości zgodnej z szablonem:
         ACLMessage msg = myAgent.receive(mt);
         if (msg != null) {  // jeśli nadeszła wiadomość zgodna z ustalonym wcześniej szablonem
-          String title = msg.getContent();  // odczytanie tytułu zamawianej książki
-
-          System.out.println("Agent-sprzedawca "+getAID().getName()+" otrzymał wiadomość: "+
-                   title);
+          String senderKey = msg.getSender().getName();
           ACLMessage reply = msg.createReply();               // tworzenie wiadomości - odpowiedzi
-          Integer price = (Integer) catalogue.get(title);     // ustalenie ceny dla podanego tytułu
-          if (price != null) {                                // jeśli taki tytuł jest dostępny
-            reply.setPerformative(ACLMessage.PROPOSE);            // ustalenie typu wiadomości (propozycja)
-            reply.setContent(String.valueOf(price.intValue()));   // umieszczenie ceny w polu zawartości (content)
-            System.out.println("Agent-sprzedawca "+getAID().getName()+" odpowiada: "+
-                   price.intValue());
+          if (msg.getPerformative() == ACLMessage.CFP)
+          {
+            String title = msg.getContent();  // odczytanie tytułu zamawianej książki
+
+            System.out.println("Agent-sprzedawca "+getAID().getName()+" otrzymał wiadomość: "+
+                     title);
+            Integer price = (Integer) catalogue.get(title);     // ustalenie ceny dla podanego tytułu
+            if (price != null) {                                // jeśli taki tytuł jest dostępny
+              reply.setPerformative(ACLMessage.PROPOSE);            // ustalenie typu wiadomości (propozycja)
+              reply.setContent(String.valueOf(price.intValue()));   // umieszczenie ceny w polu zawartości (content)
+              currentPrices.put(senderKey, price);
+              decrementCounts.put(senderKey, new Integer(0));
+              System.out.println("Agent-sprzedawca "+getAID().getName()+" odpowiada: "+
+                     price.intValue());
+            }
+            else {                                              // jeśli tytuł niedostępny
+              // The requested book is NOT available for sale.
+              reply.setPerformative(ACLMessage.REFUSE);         // ustalenie typu wiadomości (odmowa)
+              reply.setContent("tytuł chwilowo niedostępny");                  // treść wiadomości
+            }
+            myAgent.send(reply);                                // wysłanie odpowiedzi
           }
-          else {                                              // jeśli tytuł niedostępny
-            // The requested book is NOT available for sale.
-            reply.setPerformative(ACLMessage.REFUSE);         // ustalenie typu wiadomości (odmowa)
-            reply.setContent("tytuł chwilowo niedostępny");                  // treść wiadomości
+          else if (msg.getPerformative() == ACLMessage.PROPOSE)
+          {
+            Integer currentPrice = (Integer) currentPrices.get(senderKey);
+            Integer count = (Integer) decrementCounts.get(senderKey);
+            if (currentPrice == null || count == null)
+            {
+              reply.setPerformative(ACLMessage.REFUSE);
+              reply.setContent("brak aktywnej negocjacji");
+              myAgent.send(reply);
+              return;
+            }
+            if (count.intValue() >= MAX_DECREMENTS)
+            {
+              reply.setPerformative(ACLMessage.REFUSE);
+              reply.setContent("limit obniżek wyczerpany");
+              myAgent.send(reply);
+              return;
+            }
+            int newPrice = Math.max(0, currentPrice.intValue() - PRICE_DECREMENT);
+            decrementCounts.put(senderKey, new Integer(count.intValue() + 1));
+            currentPrices.put(senderKey, new Integer(newPrice));
+            reply.setPerformative(ACLMessage.PROPOSE);
+            reply.setContent(String.valueOf(newPrice));
+            myAgent.send(reply);
           }
-          myAgent.send(reply);                                // wysłanie odpowiedzi
         }
         else                       // jeśli wiadomość nie nadeszła, lub była niezgodna z szablonem
         {
@@ -101,6 +138,9 @@ public class BookSellerAgent extends Agent
           String title = msg.getContent();
           reply.setPerformative(ACLMessage.INFORM);
           System.out.println("Agent-sprzedawca (wersja g lato,2025/2026) "+getAID().getName()+" sprzedał książkę o tytule: "+title);
+          String senderKey = msg.getSender().getName();
+          currentPrices.remove(senderKey);
+          decrementCounts.remove(senderKey);
           myAgent.send(reply);
         }
       }
