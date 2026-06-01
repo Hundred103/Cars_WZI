@@ -95,6 +95,8 @@ public class BookSellerAgent extends Agent
           {
             Integer currentPrice = (Integer) currentPrices.get(senderKey);
             Integer count = (Integer) decrementCounts.get(senderKey);
+            System.out.println("Agent-sprzedawca " + getAID().getName() + " otrzymał kontrofertę kupca: " + msg.getContent());
+
             if (currentPrice == null || count == null)
             {
               reply.setPerformative(ACLMessage.REFUSE);
@@ -104,6 +106,7 @@ public class BookSellerAgent extends Agent
             }
             if (count.intValue() >= MAX_DECREMENTS)
             {
+              System.out.println("Agent-sprzedawca " + getAID().getName() + " odrzuca (wyczerpany limit obniżek)");
               reply.setPerformative(ACLMessage.REFUSE);
               reply.setContent("limit obniżek wyczerpany");
               myAgent.send(reply);
@@ -114,6 +117,7 @@ public class BookSellerAgent extends Agent
             currentPrices.put(senderKey, new Integer(newPrice));
             reply.setPerformative(ACLMessage.PROPOSE);
             reply.setContent(String.valueOf(newPrice));
+            System.out.println("Agent-sprzedawca " + getAID().getName() + " nowa oferta po obniżce: " + newPrice);
             myAgent.send(reply);
           }
         }

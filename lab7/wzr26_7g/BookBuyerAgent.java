@@ -110,6 +110,7 @@ public class BookBuyerAgent extends Agent {
             if (reply.getPerformative() == ACLMessage.PROPOSE)   // jeśli wiadomość jest typu PROPOSE
             {
               int price = Integer.parseInt(reply.getContent());  // cena książki
+              System.out.println("Agent-kupiec otrzymał ofertę " + price + " od " + reply.getSender().getName());
               if (bestSeller == null || price < bestPrice)       // jeśli jest to najlepsza oferta
               {
                 bestPrice = price;
@@ -122,19 +123,23 @@ public class BookBuyerAgent extends Agent {
               if (bestSeller != null)
               {
                 lastSellerPrice = bestPrice;
-                lastBuyerPrice = Math.round(bestPrice * 0.75f);
+                lastBuyerPrice = (int)Math.round(bestPrice * 0.75);
+                System.out.println("Agent-kupiec kontruje najlepszą ofertę (" + bestPrice + ") proponując: " + lastBuyerPrice);
+                
                 ACLMessage counter = new ACLMessage(ACLMessage.PROPOSE);
                 counter.addReceiver(bestSeller);
                 counter.setContent(String.valueOf(lastBuyerPrice));
                 counter.setConversationId("book-trade");
                 counter.setReplyWith("counter"+System.currentTimeMillis());
                 myAgent.send(counter);
+                
                 mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
-                                         MessageTemplate.MatchInReplyTo(counter.getReplyWith()));
+                                         MessageTemplate.MatchSender(bestSeller));
                 step = 2;
               }
               else
               {
+                System.out.println("Brak dostępnych ofert od sprzedawców.");
                 step = 4;
               }
             }
@@ -150,38 +155,51 @@ public class BookBuyerAgent extends Agent {
           {
             if (reply.getPerformative() == ACLMessage.PROPOSE)
             {
-              int sellerPrice = Integer.parseInt(reply.getContent());
-              lastSellerPrice = sellerPrice;
-              if (Math.abs(lastSellerPrice - lastBuyerPrice) <= 2)
-              {
-                ACLMessage order = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                order.addReceiver(bestSeller);
-                order.setContent(targetBookTitle);
-                order.setConversationId("book-trade");
-                order.setReplyWith("order"+System.currentTimeMillis());
-                myAgent.send(order);
-                mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
-                                         MessageTemplate.MatchInReplyTo(order.getReplyWith()));
-                step = 3;
-              }
-              else
-              {
-                int nextBuyerPrice = Math.round((3.0f * lastBuyerPrice + 2.0f * lastSellerPrice) / 5.0f);
-                lastBuyerPrice = nextBuyerPrice;
-                ACLMessage counter = new ACLMessage(ACLMessage.PROPOSE);
-                counter.addReceiver(bestSeller);
-                counter.setContent(String.valueOf(lastBuyerPrice));
-                counter.setConversationId("book-trade");
-                counter.setReplyWith("counter"+System.currentTimeMillis());
-                myAgent.send(counter);
-                mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
-                                         MessageTemplate.MatchInReplyTo(counter.getReplyWith()));
+              try {
+                int sellerPrice = Integer.parseInt(reply.getContent());
+                lastSellerPrice = sellerPrice;
+                System.out.println("Otrzymano nową ofertę od sprzedawcy: " + lastSellerPrice);
+                
+                if (Math.abs(lastSellerPrice - lastBuyerPrice) <= 2)
+                {
+                  System.out.println("Osiągnięto porozumienie! Wysyłam akceptację: " + lastSellerPrice);
+                  ACLMessage order = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+                  order.addReceiver(bestSeller);
+                  order.setContent(targetBookTitle);
+                  order.setConversationId("book-trade");
+                  order.setReplyWith("order"+System.currentTimeMillis());
+                  myAgent.send(order);
+                  
+                  mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
+                                           MessageTemplate.MatchInReplyTo(order.getReplyWith()));
+                  step = 3;
+                }
+                else
+                {
+                  int nextBuyerPrice = (int)Math.round((3.0 * lastBuyerPrice + 2.0 * lastSellerPrice) / 5.0);
+                  lastBuyerPrice = nextBuyerPrice;
+                  System.out.println("Brak porozumienia. Wysyłam kontrofertę: " + lastBuyerPrice);
+                  
+                  ACLMessage counter = new ACLMessage(ACLMessage.PROPOSE);
+                  counter.addReceiver(bestSeller);
+                  counter.setContent(String.valueOf(lastBuyerPrice));
+                  counter.setConversationId("book-trade");
+                  counter.setReplyWith("counter"+System.currentTimeMillis());
+                  myAgent.send(counter);
+                }
+              } catch (Exception e) {
+                System.out.println("Błąd parsowania ceny sprzedawcy: " + reply.getContent());
+                step = 4;
               }
             }
             else if (reply.getPerformative() == ACLMessage.REFUSE)
             {
-              System.out.println("Sprzedawca odmówił dalszych negocjacji.");
+              System.out.println("Sprzedawca odmówił dalszych negocjacji. Powód: " + reply.getContent());
               step = 4;
+            }
+            else
+            {
+              System.out.println("Nieoczekiwana wiadomość: " + ACLMessage.getPerformative(reply.getPerformative()));
             }
           }
           else
