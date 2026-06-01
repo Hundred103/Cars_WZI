@@ -196,6 +196,7 @@ public class BookBuyerAgent extends Agent {
             {
               System.out.println("Sprzedawca odmówił dalszych negocjacji. Powód: " + reply.getContent());
               step = 4;
+              myAgent.doDelete(); // Agent kończy działanie po odrzuceniu
             }
             else
             {
