@@ -129,7 +129,8 @@ public class BookSellerAgent extends Agent
     {
       public void action()
       {
-        ACLMessage msg = myAgent.receive();
+        MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
+        ACLMessage msg = myAgent.receive(mt);
 
         if ((msg != null)&&(msg.getPerformative() == ACLMessage.ACCEPT_PROPOSAL))
         {
@@ -142,6 +143,10 @@ public class BookSellerAgent extends Agent
           currentPrices.remove(senderKey);
           decrementCounts.remove(senderKey);
           myAgent.send(reply);
+        }
+        else
+        {
+          block();
         }
       }
     } // Koniec klasy wewnętrznej będącej rozszerzeniem klasy CyclicBehaviour
