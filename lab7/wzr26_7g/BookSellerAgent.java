@@ -11,7 +11,7 @@ public class BookSellerAgent extends Agent
 {
   // Katalog książek na sprzedaż:
   private Hashtable catalogue;
-  private static final int PRICE_DECREMENT = 2;
+  private static final int PRICE_DECREMENT = 4;
   private static final int MAX_DECREMENTS = 5;
   private Map currentPrices = new HashMap();
   private Map decrementCounts = new HashMap();
